@@ -48,9 +48,9 @@ resource "random_id" "suffix" {
 # INTENTIONAL VULNERABILITY: Hardcoded secrets in IaC
 # This triggers Wiz Code secret scanning.
 locals {
-  # Fake AWS Access Key (matches regex but invalid)
-  fake_aws_key_id     = "AKIAIOSFODNN7EXAMPLE"
-  fake_aws_secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+  # AWS Access Keys
+  aws_access_key     = "EXAMPLE"
+  aws_secret_access_key = "EXAMPLESECRETS"
 }
 
 # -----------------------------------------------------------------------------
