@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Wiz React2Shell Demo App
 
-## Getting Started
+A deliberately vulnerable Next.js application designed to demonstrate **React Server Components (RSC) Remote Code Execution (RCE)**.
 
-First, run the development server:
+## ⚠️ Intentionally Vulnerable
+This repository contains a vulnerable implementation of Next.js for educational and demonstration purposes.
+**DO NOT DEPLOY TO PRODUCTION.**
+
+### Vulnerability Details
+We utilize specific "Canary" and "Release Candidate" versions of Next.js and React to guarantee the exploitability of the `React2Shell` vulnerability.
+
+-   **Next.js**: `15.0.0-canary.160`
+-   **React**: `19.0.0-rc-66855b96-20241106`
+
+These versions contain known issues in how the server deserializes flight data, allowing for RCE when specific payloads are sent to Server Actions.
+
+## Features
+-   **RCE Sink**: A "Debug Console" that executes shell commands.
+-   **Cloud Recon**: A `/data` page that attempts to list S3 buckets (demonstrating IAM abuse).
+-   **Persistence Check**: A `/status` page that checks for files created by an attacker.
+
+## Running Locally
 
 ```bash
+# Install dependencies (requires legacy-peer-deps due to RC versions)
+npm install --legacy-peer-deps
+
+# Run dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
