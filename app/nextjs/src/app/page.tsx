@@ -4,21 +4,20 @@ import { executeCommand } from "@/utils/shell";
 // This component takes a specialized object (serialized by RSC) and executes it.
 // In a real attack, the attacker manipulates the RSC payload stream.
 // Here we simulate the logical flaw: accepting a "debug" command struct from client.
-
 async function unsafeAction(formData: FormData) {
   "use server";
-
   const cmd = formData.get("debug_cmd");
-
   if (cmd && typeof cmd === "string") {
-    console.log(`[DEBUG] Executing: ${cmd}`);
+    console.log(`[DEBUG] Executing: ${cmd}`);  // Fixed syntax
     // VULNERABILITY: Direct injection into shell execution
-    // The React2Shell exploit works by manipulating how React deserializes 
-    // the function arguments, often bypassing typical string sanitization 
-    // or invoking unexpected gadgets. 
+    // The React2Shell exploit works by manipulating how React deserializes
+    // the function arguments, often bypassing typical string sanitization
+    // or invoking unexpected gadgets.
     // For this level 1 demo, we expose a direct sink via a Server Action.
-    await executeCommand(cmd);
+    const result = await executeCommand(cmd);
+    return result;  // Return the output to see it in the response!
   }
+  return { output: null, error: "No command provided" };
 }
 
 export default function Home() {
@@ -42,7 +41,6 @@ export default function Home() {
               View Status
             </a>
           </div>
-
           <div className="p-6 bg-slate-800 rounded-xl border border-slate-700 hover:border-purple-500 transition-all group">
             <h2 className="text-2xl font-bold mb-2 group-hover:text-purple-400">Secure Data</h2>
             <p className="text-slate-400 mb-4">Access encrypted corporate records.</p>
@@ -67,7 +65,6 @@ export default function Home() {
             </button>
           </form>
         </div>
-
       </div>
     </div>
   );
