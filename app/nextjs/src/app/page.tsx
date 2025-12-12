@@ -1,36 +1,68 @@
-import Link from "next/link";
-
 export default function Home() {
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4">
-      <div className="max-w-2xl w-full text-center space-y-8">
-        <div className="space-y-4">
-          <h1 className="text-6xl font-black bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-            Wiz Demo
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white flex flex-col items-center justify-center p-8 relative overflow-hidden">
+      {/* Background glow effects */}
+      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-[#0254EC]/20 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-[#FFBFFF]/20 rounded-full blur-3xl animate-pulse" />
+
+      <div className="max-w-3xl w-full text-center space-y-12 relative z-10">
+        {/* Logo / Header Section */}
+        <div className="space-y-6">
+          {/* Wiz-style gradient text */}
+          <h1 className="text-7xl md:text-8xl font-black tracking-tight">
+            <span className="bg-gradient-to-r from-[#0254EC] via-[#7B93FF] to-[#FFBFFF] bg-clip-text text-transparent drop-shadow-lg">
+              Wiz
+            </span>
+            <span className="text-slate-200 ml-2">Demo</span>
           </h1>
-          <p className="text-xl text-slate-400">
-            Next.js RSC Architecture POC
+
+          <p className="text-lg md:text-xl text-slate-400 font-light tracking-wide">
+            Next.js React Server Components Architecture
           </p>
-          <div className="inline-block px-3 py-1 rounded-full bg-red-900/30 border border-red-500/30 text-red-400 text-sm font-mono mt-4">
-            v16.0.6 (Vulnerable to CVE-2025-66478)
+
+          {/* Divider line with gradient */}
+          <div className="w-24 h-1 mx-auto bg-gradient-to-r from-[#0254EC] to-[#FFBFFF] rounded-full" />
+        </div>
+
+        {/* CVE Badge */}
+        <div className="flex justify-center">
+          <div className="group relative inline-flex items-center gap-3 px-5 py-3 rounded-xl bg-slate-800/60 border border-slate-700/50 backdrop-blur-sm hover:border-[#FFBFFF]/50 transition-all duration-300">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+              <span className="text-red-400 font-semibold text-sm uppercase tracking-wider">Vulnerable</span>
+            </div>
+            <div className="h-4 w-px bg-slate-600" />
+            <code className="text-slate-300 text-sm font-mono">
+              Next.js 16.0.6 • CVE-2025-66478
+            </code>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-          <div className="p-6 bg-slate-800 rounded-xl border border-slate-700 hover:border-blue-500 transition-all group">
-            <h2 className="text-2xl font-bold mb-2 group-hover:text-blue-400">Status Check</h2>
-            <p className="text-slate-400 mb-4">View system health and banners.</p>
-            <Link href="/status" className="inline-block w-full py-2 bg-slate-700 hover:bg-slate-600 rounded text-center transition-colors">
-              View Status
-            </Link>
+        {/* Info Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+          <div className="p-5 rounded-xl bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/60 transition-all duration-300">
+            <div className="text-[#0254EC] text-2xl mb-2">🛡️</div>
+            <h3 className="text-slate-200 font-semibold mb-1">Security Demo</h3>
+            <p className="text-slate-500 text-sm">Intentionally vulnerable for testing</p>
           </div>
-          <div className="p-6 bg-slate-800 rounded-xl border border-slate-700 hover:border-purple-500 transition-all group">
-            <h2 className="text-2xl font-bold mb-2 group-hover:text-purple-400">Secure Data</h2>
-            <p className="text-slate-400 mb-4">Access encrypted corporate records.</p>
-            <Link href="/data" className="inline-block w-full py-2 bg-slate-700 hover:bg-slate-600 rounded text-center transition-colors">
-              Access Data
-            </Link>
+          <div className="p-5 rounded-xl bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/60 transition-all duration-300">
+            <div className="text-[#FFBFFF] text-2xl mb-2">⚡</div>
+            <h3 className="text-slate-200 font-semibold mb-1">RSC Exploit</h3>
+            <p className="text-slate-500 text-sm">React Server Components RCE</p>
           </div>
+          <div className="p-5 rounded-xl bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/60 transition-all duration-300">
+            <div className="text-2xl mb-2">☁️</div>
+            <h3 className="text-slate-200 font-semibold mb-1">Cloud Native</h3>
+            <p className="text-slate-500 text-sm">Deployed on AWS EKS</p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-8 text-slate-600 text-sm">
+          <p>Powered by <span className="text-[#0254EC] font-medium">Wiz</span> Cloud Security</p>
         </div>
       </div>
     </div>
