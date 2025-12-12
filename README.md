@@ -1,30 +1,79 @@
-# Wiz React2Shell Demo App
+# Wiz React2Shell Demo
 
-A deliberately vulnerable Next.js application designed to demonstrate **React Server Components (RSC) Remote Code Execution (RCE)**.
+A deliberately vulnerable Next.js application demonstrating **CVE-2025-66478** - React Server Components Remote Code Execution.
 
-## ⚠️ Intentionally Vulnerable
-This repository contains a vulnerable implementation of Next.js for educational and demonstration purposes.
-**DO NOT DEPLOY TO PRODUCTION.**
+## ⚠️ Security Warning
 
-### Vulnerability Details
-We utilize specific "Canary" and "Release Candidate" versions of Next.js and React to guarantee the exploitability of the `React2Shell` vulnerability.
+> **DO NOT DEPLOY TO PRODUCTION**
+> 
+> This repository contains intentionally vulnerable code for security demonstration purposes only.
 
--   **Next.js**: `15.0.0-canary.160`
--   **React**: `19.0.0-rc-66855b96-20241106`
+## Vulnerability Details
 
-These versions contain known issues in how the server deserializes flight data, allowing for RCE when specific payloads are sent to Server Actions.
+| Component | Version | CVE |
+|-----------|---------|-----|
+| Next.js | 16.0.6 | CVE-2025-66478 |
+| React | 19.2.0 | - |
 
-## Features
--   **RCE Sink**: A "Debug Console" that executes shell commands.
--   **Cloud Recon**: A `/data` page that attempts to list S3 buckets (demonstrating IAM abuse).
--   **Persistence Check**: A `/status` page that checks for files created by an attacker.
+This version of Next.js contains a critical vulnerability in how React Server Components deserialize flight data, allowing Remote Code Execution.
 
-## Running Locally
+### Built From Template
+
+This app was scaffolded using the official `create-next-app` template:
 
 ```bash
-# Install dependencies (requires legacy-peer-deps due to RC versions)
-npm install --legacy-peer-deps
+npx create-next-app@16.0.6 app/nextjs --typescript --tailwind --eslint --app --src-dir
+```
 
-# Run dev server
+The template itself is vulnerable out-of-the-box—no additional exploit code was added.
+
+## Project Structure
+
+```
+├── app/nextjs/          # Vulnerable Next.js application
+│   ├── src/app/         # App router pages
+│   ├── Dockerfile       # Container build
+│   └── package.json     # Dependencies (pinned to vulnerable versions)
+├── infra/aws/           # Terraform infrastructure
+│   ├── main.tf          # VPC, EKS, S3, ECR
+│   └── variables.tf     # Configuration
+└── infra/k8s/           # Kubernetes manifests (TODO)
+```
+
+## Quick Start
+
+### Local Development
+
+```bash
+cd app/nextjs
+npm install
 npm run dev
 ```
+
+### Docker
+
+```bash
+cd app/nextjs
+docker build -t wiz-rsc-demo:latest .
+docker run --rm -p 3000:3000 wiz-rsc-demo:latest
+```
+
+Access at: http://localhost:3000
+
+## Demo Purpose
+
+This environment is designed to demonstrate:
+
+- **Wiz Code**: Detects vulnerable dependencies and hardcoded secrets in IaC
+- **Wiz Cloud**: Discovers misconfigured S3 buckets and over-permissive IAM roles
+- **Wiz Defend**: Detects runtime exploitation (RCE, file writes, AWS API calls)
+
+## Attack Path
+
+```
+Internet → LoadBalancer → EKS Pod (RCE) → Node IAM Role → Sensitive S3 Bucket
+```
+
+## License
+
+For educational and demonstration purposes only.
