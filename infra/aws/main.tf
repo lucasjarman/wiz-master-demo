@@ -320,7 +320,190 @@ resource "aws_s3_object" "secret_roadmap" {
 }
 
 # -----------------------------------------------------------------------------
-# 8. ECR REPOSITORY
+# 8. CLOUDTRAIL (FOR WIZ DEFEND)
+# -----------------------------------------------------------------------------
+# S3 bucket for CloudTrail logs
+resource "aws_s3_bucket" "cloudtrail_logs" {
+  bucket        = "wiz-demo-cloudtrail-${random_id.suffix.hex}"
+  force_destroy = true
+
+  tags = {
+    Name        = "CloudTrail Logs"
+    Environment = "Demo"
+  }
+}
+
+resource "aws_s3_bucket_policy" "cloudtrail_logs" {
+  bucket = aws_s3_bucket.cloudtrail_logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AWSCloudTrailAclCheck"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:GetBucketAcl"
+        Resource = aws_s3_bucket.cloudtrail_logs.arn
+      },
+      {
+        Sid    = "AWSCloudTrailWrite"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.cloudtrail_logs.arn}/*"
+        Condition = {
+          StringEquals = {
+            "s3:x-amz-acl" = "bucket-owner-full-control"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# CloudTrail with S3 Data Events
+resource "aws_cloudtrail" "main" {
+  name                          = "wiz-demo-trail-${random_id.suffix.hex}"
+  s3_bucket_name                = aws_s3_bucket.cloudtrail_logs.id
+  include_global_service_events = true
+  is_multi_region_trail         = false
+
+  # S3 Data Events for sensitive bucket - captures GetObject, PutObject etc
+  event_selector {
+    read_write_type           = "All"
+    include_management_events = true
+
+    data_resource {
+      type   = "AWS::S3::Object"
+      values = ["${aws_s3_bucket.sensitive_data.arn}/"]
+    }
+  }
+
+  depends_on = [aws_s3_bucket_policy.cloudtrail_logs]
+
+  tags = {
+    Environment = "Demo"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# 9. VPC FLOW LOGS (FOR WIZ DEFEND)
+# -----------------------------------------------------------------------------
+resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
+  name              = "/aws/vpc/wiz-demo-flow-logs-${random_id.suffix.hex}"
+  retention_in_days = 7
+
+  tags = {
+    Environment = "Demo"
+  }
+}
+
+resource "aws_iam_role" "vpc_flow_logs" {
+  name = "wiz-demo-vpc-flow-logs-${random_id.suffix.hex}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "vpc_flow_logs" {
+  name = "vpc-flow-logs-policy"
+  role = aws_iam_role.vpc_flow_logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_flow_log" "main" {
+  iam_role_arn    = aws_iam_role.vpc_flow_logs.arn
+  log_destination = aws_cloudwatch_log_group.vpc_flow_logs.arn
+  traffic_type    = "ALL"
+  vpc_id          = module.vpc.vpc_id
+
+  tags = {
+    Name        = "wiz-demo-vpc-flow-log"
+    Environment = "Demo"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# 10. ROUTE 53 RESOLVER QUERY LOGS (FOR WIZ DEFEND - DNS EXFIL DETECTION)
+# -----------------------------------------------------------------------------
+resource "aws_cloudwatch_log_group" "dns_query_logs" {
+  name              = "/aws/route53/wiz-demo-dns-logs-${random_id.suffix.hex}"
+  retention_in_days = 7
+
+  tags = {
+    Environment = "Demo"
+  }
+}
+
+resource "aws_cloudwatch_log_resource_policy" "dns_query_logs" {
+  policy_name = "wiz-demo-dns-query-logs-${random_id.suffix.hex}"
+
+  policy_document = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Route53ResolverQueryLogging"
+        Effect = "Allow"
+        Principal = {
+          Service = "route53.amazonaws.com"
+        }
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:log-group:/aws/route53/*"
+      }
+    ]
+  })
+}
+
+resource "aws_route53_resolver_query_log_config" "main" {
+  name            = "wiz-demo-dns-query-log-${random_id.suffix.hex}"
+  destination_arn = aws_cloudwatch_log_group.dns_query_logs.arn
+
+  tags = {
+    Environment = "Demo"
+  }
+}
+
+resource "aws_route53_resolver_query_log_config_association" "main" {
+  resolver_query_log_config_id = aws_route53_resolver_query_log_config.main.id
+  resource_id                  = module.vpc.vpc_id
+}
+
+# -----------------------------------------------------------------------------
+# 11. ECR REPOSITORY
 # -----------------------------------------------------------------------------
 resource "aws_ecr_repository" "app_repo" {
   name                 = "wiz-rsc-demo-app-${random_id.suffix.hex}"
