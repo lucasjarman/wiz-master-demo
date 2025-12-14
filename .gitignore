@@ -35,3 +35,6 @@ wizcli
 
 # gemini
 GEMINI.md
+
+# SSH Keys
+*.pem

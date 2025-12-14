@@ -219,25 +219,32 @@ resource "aws_instance" "demo_app" {
     http_put_response_hop_limit = 2
   }
 
-  # User data script to install Docker and run the app
+  # User data script to install Docker (image pulled manually after ECR push)
   user_data = <<-EOF
     #!/bin/bash
     set -e
 
-    # Install Docker
-    dnf install -y docker
+    # Install Docker and AWS CLI
+    dnf install -y docker aws-cli
     systemctl enable docker
     systemctl start docker
 
-    # Login to ECR
-    aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.app_repo.repository_url}
+    # Add ec2-user to docker group for easier management
+    usermod -aG docker ec2-user
 
-    # Pull and run the vulnerable app
-    docker pull ${aws_ecr_repository.app_repo.repository_url}:latest
-    docker run -d --restart=always -p 3000:3000 --name wiz-demo ${aws_ecr_repository.app_repo.repository_url}:latest
+    # Create helper script for pulling and running the app
+    cat > /home/ec2-user/start-demo.sh << 'SCRIPT'
+    #!/bin/bash
+    ECR_URL="${aws_ecr_repository.app_repo.repository_url}"
+    aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin $ECR_URL
+    docker pull $ECR_URL:latest
+    docker run -d --restart=always -p 3000:3000 --name wiz-demo $ECR_URL:latest
+    echo "Demo app started at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3000"
+    SCRIPT
+    chmod +x /home/ec2-user/start-demo.sh
+    chown ec2-user:ec2-user /home/ec2-user/start-demo.sh
 
-    # Signal completion
-    echo "Demo app deployed successfully" > /tmp/deploy-complete.txt
+    echo "Docker installed. Run ~/start-demo.sh after pushing image to ECR" > /tmp/setup-complete.txt
   EOF
 
   tags = {
