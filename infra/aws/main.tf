@@ -392,61 +392,23 @@ resource "aws_cloudtrail" "main" {
 }
 
 # -----------------------------------------------------------------------------
-# 9. VPC FLOW LOGS (FOR WIZ DEFEND)
+# 9. VPC FLOW LOGS (FOR WIZ DEFEND) - S3 DESTINATION
 # -----------------------------------------------------------------------------
-resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
-  name              = "/aws/vpc/wiz-demo-flow-logs-${random_id.suffix.hex}"
-  retention_in_days = 7
+resource "aws_s3_bucket" "vpc_flow_logs" {
+  bucket        = "wiz-demo-vpc-flow-logs-${random_id.suffix.hex}"
+  force_destroy = true
 
   tags = {
+    Name        = "VPC Flow Logs"
     Environment = "Demo"
   }
 }
 
-resource "aws_iam_role" "vpc_flow_logs" {
-  name = "wiz-demo-vpc-flow-logs-${random_id.suffix.hex}"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "vpc-flow-logs.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy" "vpc_flow_logs" {
-  name = "vpc-flow-logs-policy"
-  role = aws_iam_role.vpc_flow_logs.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams"
-        ]
-        Effect   = "Allow"
-        Resource = "*"
-      }
-    ]
-  })
-}
-
 resource "aws_flow_log" "main" {
-  iam_role_arn    = aws_iam_role.vpc_flow_logs.arn
-  log_destination = aws_cloudwatch_log_group.vpc_flow_logs.arn
-  traffic_type    = "ALL"
-  vpc_id          = module.vpc.vpc_id
+  log_destination_type = "s3"
+  log_destination      = aws_s3_bucket.vpc_flow_logs.arn
+  traffic_type         = "ALL"
+  vpc_id               = module.vpc.vpc_id
 
   tags = {
     Name        = "wiz-demo-vpc-flow-log"
@@ -455,42 +417,62 @@ resource "aws_flow_log" "main" {
 }
 
 # -----------------------------------------------------------------------------
-# 10. ROUTE 53 RESOLVER QUERY LOGS (FOR WIZ DEFEND - DNS EXFIL DETECTION)
+# 10. ROUTE 53 RESOLVER QUERY LOGS (FOR WIZ DEFEND - DNS EXFIL DETECTION) - S3
 # -----------------------------------------------------------------------------
-resource "aws_cloudwatch_log_group" "dns_query_logs" {
-  name              = "/aws/route53/wiz-demo-dns-logs-${random_id.suffix.hex}"
-  retention_in_days = 7
+resource "aws_s3_bucket" "dns_query_logs" {
+  bucket        = "wiz-demo-dns-logs-${random_id.suffix.hex}"
+  force_destroy = true
 
   tags = {
+    Name        = "Route 53 DNS Query Logs"
     Environment = "Demo"
   }
 }
 
-resource "aws_cloudwatch_log_resource_policy" "dns_query_logs" {
-  policy_name = "wiz-demo-dns-query-logs-${random_id.suffix.hex}"
+resource "aws_s3_bucket_policy" "dns_query_logs" {
+  bucket = aws_s3_bucket.dns_query_logs.id
 
-  policy_document = jsonencode({
+  policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "Route53ResolverQueryLogging"
+        Sid    = "AWSLogDeliveryAclCheck"
         Effect = "Allow"
         Principal = {
-          Service = "route53.amazonaws.com"
+          Service = "delivery.logs.amazonaws.com"
         }
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "arn:aws:logs:*:*:log-group:/aws/route53/*"
+        Action   = "s3:GetBucketAcl"
+        Resource = aws_s3_bucket.dns_query_logs.arn
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      },
+      {
+        Sid    = "AWSLogDeliveryWrite"
+        Effect = "Allow"
+        Principal = {
+          Service = "delivery.logs.amazonaws.com"
+        }
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.dns_query_logs.arn}/*"
+        Condition = {
+          StringEquals = {
+            "s3:x-amz-acl"      = "bucket-owner-full-control"
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
       }
     ]
   })
 }
 
+data "aws_caller_identity" "current" {}
+
 resource "aws_route53_resolver_query_log_config" "main" {
   name            = "wiz-demo-dns-query-log-${random_id.suffix.hex}"
-  destination_arn = aws_cloudwatch_log_group.dns_query_logs.arn
+  destination_arn = aws_s3_bucket.dns_query_logs.arn
 
   tags = {
     Environment = "Demo"
