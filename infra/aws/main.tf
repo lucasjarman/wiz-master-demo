@@ -209,6 +209,15 @@ resource "aws_instance" "demo_app" {
 
   associate_public_ip_address = true
 
+  # INTENTIONAL VULNERABILITY: IMDSv1 enabled for credential theft demo
+  # - http_tokens = "optional" allows IMDSv1 (no token required)
+  # - hop_limit = 2 allows Docker containers to reach IMDS
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "optional"
+    http_put_response_hop_limit = 2
+  }
+
   # User data script to install Docker and run the app
   user_data = <<-EOF
     #!/bin/bash
