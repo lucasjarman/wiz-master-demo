@@ -10,8 +10,8 @@ variable "aws_profile" {
   default     = "wiz-demo"
 }
 
-variable "eks_node_instance_type" {
-  description = "Instance type for the EKS managed node group"
+variable "ec2_instance_type" {
+  description = "Instance type for the demo EC2 instance"
   type        = string
-  default     = "t3.medium" # Recommended minimum for K8s system pods
+  default     = "t3.small"
 }

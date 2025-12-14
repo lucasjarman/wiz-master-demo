@@ -23,12 +23,17 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.app_repo.repository_url
 }
 
-output "cluster_endpoint" {
-  description = "Endpoint for EKS control plane"
-  value       = module.eks.cluster_endpoint
+output "ec2_public_ip" {
+  description = "Public IP of the demo EC2 instance"
+  value       = aws_instance.demo_app.public_ip
 }
 
-output "cluster_name" {
-  description = "Kubernetes Cluster Name"
-  value       = module.eks.cluster_name
+output "ec2_public_dns" {
+  description = "Public DNS of the demo EC2 instance"
+  value       = aws_instance.demo_app.public_dns
+}
+
+output "app_url" {
+  description = "URL to access the vulnerable demo app"
+  value       = "http://${aws_instance.demo_app.public_ip}:3000"
 }

