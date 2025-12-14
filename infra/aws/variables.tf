@@ -15,3 +15,8 @@ variable "ec2_instance_type" {
   type        = string
   default     = "t3.small"
 }
+
+variable "ssh_key_name" {
+  description = "Name of existing EC2 key pair for SSH access"
+  type        = string
+}
