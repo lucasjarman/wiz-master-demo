@@ -361,6 +361,29 @@ resource "aws_instance" "demo_app_ubuntu" {
 }
 
 # -----------------------------------------------------------------------------
+# 6c. ELASTIC IPs (STATIC IPs FOR ASM)
+# -----------------------------------------------------------------------------
+resource "aws_eip" "demo_app" {
+  instance = aws_instance.demo_app.id
+  domain   = "vpc"
+
+  tags = {
+    Name        = "wiz-rsc-demo-eip-${random_id.suffix.hex}"
+    Environment = "Demo"
+  }
+}
+
+resource "aws_eip" "demo_app_ubuntu" {
+  instance = aws_instance.demo_app_ubuntu.id
+  domain   = "vpc"
+
+  tags = {
+    Name        = "wiz-rsc-demo-ubuntu-eip-${random_id.suffix.hex}"
+    Environment = "Demo"
+  }
+}
+
+# -----------------------------------------------------------------------------
 # 7. VULNERABLE S3 BUCKET (SENSITIVE DATA)
 # -----------------------------------------------------------------------------
 # INTENTIONAL VULNERABILITY: Public S3 Bucket containing "sensitive" data.
