@@ -1,28 +1,23 @@
 FROM node:20-alpine
 
-# Install dependencies (curl needed for OAST callbacks, aws-cli for S3 access)
+# Install tools needed for exploit demo (curl for OAST, aws-cli for S3, bash for shell commands)
 RUN apk add --no-cache libc6-compat curl aws-cli bash
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and install dependencies
 COPY package.json package-lock.json* ./
-
-# Install dependencies
 RUN npm ci
 
-# Copy source code
+# Copy source code and build
 COPY . .
-
-# Disable telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
 
-# IMPORTANT: Dev mode required for CVE-2025-66478 RCE to work
-ENV NODE_ENV=development
-
+# CVE-2025-66478 RCE works in both dev and prod modes
+ENV NODE_ENV=production
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Run in dev mode (required for RCE exploit)
-CMD ["npm", "run", "dev"]
+CMD ["npm", "start"]

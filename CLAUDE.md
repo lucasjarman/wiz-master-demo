@@ -57,7 +57,7 @@ docker build --platform linux/amd64 -t wiz-rsc-demo:latest .
 docker run --rm -p 3000:3000 wiz-rsc-demo:latest
 ```
 
-**Note:** Container runs in dev mode (`npm run dev`) with curl, aws-cli, and bash installed. This is required for CVE-2025-66478 RCE to work - production builds are not vulnerable.
+**Note:** Container includes curl, aws-cli, and bash for exploit demo. CVE-2025-66478 RCE works in both dev and production modes.
 
 ### Terraform (Infrastructure)
 
@@ -81,11 +81,11 @@ terraform destroy
 ### Infrastructure Design
 
 - **Amazon Linux EC2** (54.206.239.140):
-  - **Container (port 3000)**: `~/start-demo.sh` - pulls from ECR, runs in Docker (dev mode)
-  - **Native (port 3001)**: `~/start-native.sh` - clones repo, runs `npm run dev`
+  - **Container (port 3000)**: `~/start-demo.sh` - pulls from ECR, runs in Docker
+  - **Native (port 3001)**: `~/start-native.sh` - clones repo, builds and runs
   - SSH: `ssh -i wiz-master-demo.pem ec2-user@54.206.239.140`
 - **Ubuntu EC2** (52.62.49.203):
-  - **Native (port 80)**: `~/start-app.sh` - clones repo, runs `npm run dev`
+  - **Native (port 80)**: `~/start-app.sh` - clones repo, builds and runs
   - SSH: `ssh -i wiz-master-demo.pem ubuntu@52.62.49.203`
 - **Over-permissive IAM**: Instance profile has S3 read access (lateral movement path)
 - **Public S3 bucket**: Contains fake PII, medical records, API keys
@@ -148,7 +148,7 @@ Content-Disposition: form-data; name="2"\r
 - ✅ Next.js app with vulnerable versions (Next.js 16.0.6, React 19.2.0)
 - ✅ Amazon Linux EC2 with container (port 3000) and native (port 3001)
 - ✅ Ubuntu EC2 with native app (port 80)
-- ✅ Docker container runs in dev mode (RCE works)
+- ✅ Docker container with curl/aws-cli/bash (RCE works in dev and prod)
 - ✅ Elastic IPs for stable ASM tracking
 - ✅ Terraform for EC2 + S3 + IAM + CloudTrail + VPC Flow Logs
 - ✅ S3 bucket with fake PII, medical records, API keys

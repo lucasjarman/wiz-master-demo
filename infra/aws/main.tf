@@ -278,9 +278,10 @@ resource "aws_instance" "demo_app" {
     cd wiz-master-demo/app/nextjs
     git pull
     npm install
-    # IMPORTANT: Must run in dev mode for CVE-2025-66478 exploit to work
-    PORT=3001 npm run dev &
-    echo "Native app (DEV MODE) started at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3001"
+    npm run build
+    # CVE-2025-66478 RCE works in both dev and prod modes
+    PORT=3001 npm start &
+    echo "Native app started at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3001"
     SCRIPT
     chmod +x /home/ec2-user/start-native.sh
     chown ec2-user:ec2-user /home/ec2-user/start-native.sh
@@ -342,9 +343,10 @@ resource "aws_instance" "demo_app_ubuntu" {
     cd /home/ubuntu/wiz-master-demo/app/nextjs
     git pull
     npm install
-    # IMPORTANT: Must run in dev mode for CVE-2025-66478 exploit to work
-    PORT=80 npm run dev &
-    echo "App (DEV MODE) started at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):80"
+    npm run build
+    # CVE-2025-66478 RCE works in both dev and prod modes
+    PORT=80 npm start &
+    echo "Native app started at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):80"
     SCRIPT
     chmod +x /home/ubuntu/start-app.sh
     chown ubuntu:ubuntu /home/ubuntu/start-app.sh
