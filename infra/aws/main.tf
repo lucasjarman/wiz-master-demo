@@ -86,11 +86,20 @@ resource "aws_security_group" "demo_app" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # App access (port 3000)
+  # App access (port 3000 - container)
   ingress {
-    description = "App"
+    description = "App Container"
     from_port   = 3000
     to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # App access (port 3001 - native)
+  ingress {
+    description = "App Native"
+    from_port   = 3001
+    to_port     = 3001
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -219,32 +228,48 @@ resource "aws_instance" "demo_app" {
     http_put_response_hop_limit = 2
   }
 
-  # User data script to install Docker (image pulled manually after ECR push)
+  # User data script to install Docker and Node.js
   user_data = <<-EOF
     #!/bin/bash
     set -e
 
-    # Install Docker and AWS CLI
-    dnf install -y docker aws-cli
+    # Install Docker, AWS CLI, Node.js 20, and git
+    dnf install -y docker aws-cli nodejs20 npm git
     systemctl enable docker
     systemctl start docker
 
     # Add ec2-user to docker group for easier management
     usermod -aG docker ec2-user
 
-    # Create helper script for pulling and running the app
+    # Create helper script for container app (port 3000)
     cat > /home/ec2-user/start-demo.sh << 'SCRIPT'
     #!/bin/bash
     ECR_URL="${aws_ecr_repository.app_repo.repository_url}"
     aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin $ECR_URL
     docker pull $ECR_URL:latest
     docker run -d --restart=always -p 3000:3000 --name wiz-demo $ECR_URL:latest
-    echo "Demo app started at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3000"
+    echo "Container app started at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3000"
     SCRIPT
     chmod +x /home/ec2-user/start-demo.sh
     chown ec2-user:ec2-user /home/ec2-user/start-demo.sh
 
-    echo "Docker installed. Run ~/start-demo.sh after pushing image to ECR" > /tmp/setup-complete.txt
+    # Create helper script for native app (port 3001)
+    cat > /home/ec2-user/start-native.sh << 'SCRIPT'
+    #!/bin/bash
+    cd /home/ec2-user
+    if [ ! -d "wiz-master-demo" ]; then
+      git clone https://github.com/lucasjarman/wiz-master-demo.git
+    fi
+    cd wiz-master-demo/app/nextjs
+    npm install
+    npm run build
+    PORT=3001 npm start &
+    echo "Native app started at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3001"
+    SCRIPT
+    chmod +x /home/ec2-user/start-native.sh
+    chown ec2-user:ec2-user /home/ec2-user/start-native.sh
+
+    echo "Setup complete. Run ~/start-demo.sh (container) or ~/start-native.sh (native)" > /tmp/setup-complete.txt
   EOF
 
   tags = {
@@ -300,14 +325,47 @@ resource "aws_s3_bucket_policy" "sensitive_data" {
   depends_on = [aws_s3_bucket_public_access_block.sensitive_data]
 }
 
-# Fake Sensitive Data Objects
+# Fake Sensitive Data Objects - Enhanced with PII patterns for Wiz detection
 resource "aws_s3_object" "employees" {
   bucket = aws_s3_bucket.sensitive_data.id
   key    = "employees.json"
   content = jsonencode([
-    { id = 1, name = "Alice Admin", role = "SuperAdmin", salary = 150000 },
-    { id = 2, name = "Bob Builder", role = "Engineer", salary = 120000 },
-    { id = 3, name = "Charlie Chief", role = "CEO", salary = 300000 }
+    {
+      id            = 1
+      name          = "Alice Admin"
+      email         = "alice.admin@acmecorp.com"
+      role          = "SuperAdmin"
+      salary        = 150000
+      ssn           = "123-45-6789"
+      phone         = "+1-555-123-4567"
+      date_of_birth = "1985-03-15"
+      address       = "123 Main Street, San Francisco, CA 94102"
+      bank_account  = "****4521"
+    },
+    {
+      id            = 2
+      name          = "Bob Builder"
+      email         = "bob.builder@acmecorp.com"
+      role          = "Engineer"
+      salary        = 120000
+      ssn           = "987-65-4321"
+      phone         = "+1-555-987-6543"
+      date_of_birth = "1990-07-22"
+      address       = "456 Oak Avenue, Seattle, WA 98101"
+      bank_account  = "****8834"
+    },
+    {
+      id            = 3
+      name          = "Charlie Chief"
+      email         = "charlie.chief@acmecorp.com"
+      role          = "CEO"
+      salary        = 300000
+      ssn           = "456-78-9012"
+      phone         = "+1-555-456-7890"
+      date_of_birth = "1975-11-30"
+      address       = "789 Executive Blvd, New York, NY 10001"
+      bank_account  = "****2291"
+    }
   ])
   content_type = "application/json"
 }
@@ -317,6 +375,116 @@ resource "aws_s3_object" "secret_roadmap" {
   key          = "roadmap_2025_confidential.txt"
   content      = "1. Launch RCE exploit as a feature.\n2. Buy more crypto.\n3. Take over the world."
   content_type = "text/plain"
+}
+
+# Customer PII Database
+resource "aws_s3_object" "customer_pii" {
+  bucket = aws_s3_bucket.sensitive_data.id
+  key    = "customers/customer_database.csv"
+  content = <<-EOF
+customer_id,full_name,email,ssn,credit_card,cvv,phone,address,dob
+1001,John Smith,john.smith@gmail.com,234-56-7890,4532-1234-5678-9012,123,+1-408-555-0101,"100 Technology Dr, San Jose, CA 95110",1982-04-12
+1002,Jane Doe,jane.doe@yahoo.com,345-67-8901,5425-9876-5432-1098,456,+1-650-555-0202,"200 Innovation Way, Palo Alto, CA 94301",1988-09-23
+1003,Michael Johnson,m.johnson@outlook.com,456-78-9012,3782-822463-01005,789,+1-415-555-0303,"300 Market St, San Francisco, CA 94105",1979-12-05
+1004,Emily Williams,emily.w@hotmail.com,567-89-0123,6011-1234-5678-9012,234,+1-510-555-0404,"400 Broadway, Oakland, CA 94607",1995-06-18
+1005,David Brown,david.brown@proton.me,678-90-1234,4916-3456-7890-1234,567,+1-925-555-0505,"500 Main St, Walnut Creek, CA 94596",1991-02-28
+EOF
+  content_type = "text/csv"
+}
+
+# API Keys and Credentials (intentionally exposed)
+resource "aws_s3_object" "api_credentials" {
+  bucket = aws_s3_bucket.sensitive_data.id
+  key    = "config/api_keys.env"
+  content = <<-EOF
+# Production API Keys - DO NOT SHARE
+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+STRIPE_SECRET_KEY=sk_test_FAKE_KEY_FOR_DEMO_1234567890
+STRIPE_PUBLISHABLE_KEY=pk_test_FAKE_KEY_FOR_DEMO_0987654321
+DATABASE_PASSWORD=SuperSecretP@ssw0rd!2024
+JWT_SECRET=FAKE_JWT_SECRET_FOR_DEMO_PURPOSES_ONLY
+SENDGRID_API_KEY=SG.FAKE_SENDGRID_KEY_FOR_DEMO
+GITHUB_TOKEN=ghp_FAKE_TOKEN_FOR_DEMO_ONLY
+SLACK_WEBHOOK_URL=https://hooks.example.com/services/FAKE/WEBHOOK/FORDEMO
+OPENAI_API_KEY=sk-FAKE-OPENAI-KEY-FOR-DEMO-PURPOSES
+EOF
+  content_type = "text/plain"
+}
+
+# Medical Records (HIPAA sensitive)
+resource "aws_s3_object" "medical_records" {
+  bucket = aws_s3_bucket.sensitive_data.id
+  key    = "healthcare/patient_records.json"
+  content = jsonencode([
+    {
+      patient_id     = "P-10001"
+      name           = "Robert Wilson"
+      ssn            = "111-22-3333"
+      dob            = "1965-08-14"
+      medical_record = "MRN-2024-00123"
+      diagnosis      = "Type 2 Diabetes Mellitus"
+      medications    = ["Metformin 500mg", "Lisinopril 10mg"]
+      insurance_id   = "BCBS-123456789"
+      physician      = "Dr. Sarah Chen"
+    },
+    {
+      patient_id     = "P-10002"
+      name           = "Susan Martinez"
+      ssn            = "222-33-4444"
+      dob            = "1978-03-22"
+      medical_record = "MRN-2024-00456"
+      diagnosis      = "Hypertension"
+      medications    = ["Amlodipine 5mg"]
+      insurance_id   = "AETNA-987654321"
+      physician      = "Dr. James Park"
+    }
+  ])
+  content_type = "application/json"
+}
+
+# Financial Records
+resource "aws_s3_object" "financial_records" {
+  bucket = aws_s3_bucket.sensitive_data.id
+  key    = "finance/payroll_q4_2024.csv"
+  content = <<-EOF
+employee_id,name,ssn,bank_routing,bank_account,net_pay,tax_withheld,401k_contribution
+E001,Alice Admin,123-45-6789,021000021,****4521,8750.00,2250.00,625.00
+E002,Bob Builder,987-65-4321,121000358,****8834,7000.00,1800.00,500.00
+E003,Charlie Chief,456-78-9012,322271627,****2291,17500.00,7500.00,1458.33
+E004,Diana Developer,234-56-7890,091000019,****7743,6500.00,1650.00,487.50
+E005,Edward Engineer,345-67-8901,071000013,****9912,6250.00,1600.00,468.75
+EOF
+  content_type = "text/csv"
+}
+
+# Database Backup (contains credentials)
+resource "aws_s3_object" "db_backup_config" {
+  bucket = aws_s3_bucket.sensitive_data.id
+  key    = "backups/database_config.yaml"
+  content = <<-EOF
+# Database Configuration - CONFIDENTIAL
+production:
+  host: prod-db.internal.acmecorp.com
+  port: 5432
+  database: acme_production
+  username: admin
+  password: Pr0d_DB_P@ssw0rd!2024
+  ssl_mode: require
+
+replica:
+  host: replica-db.internal.acmecorp.com
+  port: 5432
+  database: acme_production
+  username: readonly
+  password: R3pl1ca_R34d0nly!
+
+redis:
+  host: redis.internal.acmecorp.com
+  port: 6379
+  password: R3d1s_C@che_2024!
+EOF
+  content_type = "text/yaml"
 }
 
 # -----------------------------------------------------------------------------

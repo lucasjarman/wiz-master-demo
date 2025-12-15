@@ -17,7 +17,8 @@ Demonstrates Wiz platform capabilities:
 ### Attack Path Narrative
 
 ```
-Internet → EC2:3000 → Docker Container (RCE via RSC) → Instance IAM Role → Sensitive S3 Bucket
+Container:  Internet → EC2:3000 → Docker Container (RCE) → IMDS → IAM Role → S3
+Native:     Internet → EC2:3001 → EC2 Host (RCE)        → IMDS → IAM Role → S3
 ```
 
 ## Repository Structure
@@ -69,10 +70,12 @@ terraform destroy
 
 ### Infrastructure Design
 
-- **EC2 + Docker**: Single instance running the vulnerable container
+- **EC2 Instance**: Single instance with two deployment options:
+  - **Container (port 3000)**: `~/start-demo.sh` - pulls from ECR, runs in Docker
+  - **Native (port 3001)**: `~/start-native.sh` - clones repo, runs directly on EC2
 - **Over-permissive IAM**: Instance profile has S3 read access (lateral movement path)
 - **Public S3 bucket**: Contains fake sensitive data (`employees.json`, `roadmap_2025_confidential.txt`)
-- **No TLS**: HTTP only on port 3000
+- **IMDSv1 enabled**: Allows credential theft from both container and native app
 
 ### App Routes
 
@@ -86,6 +89,8 @@ When exploited via CVE-2025-66478, the app allows:
 3. AWS access: `aws s3 ls`, `aws s3 cp` using instance IAM role
 
 ## Exploit Payload (CVE-2025-66478)
+
+Use port 3000 for container, port 3001 for native.
 
 ```bash
 curl -X POST http://<TARGET>:3000 \
@@ -126,10 +131,12 @@ Content-Disposition: form-data; name="2"\r
 ## Current State
 
 - ✅ Next.js app scaffolded with vulnerable versions
-- ✅ Docker build working
+- ✅ Docker build working (port 3000)
+- ✅ Native EC2 deployment option (port 3001)
 - ✅ Terraform for EC2 + S3 + IAM
 - ✅ S3 bucket with fake sensitive data
 - ✅ RCE exploit works (CVE-2025-66478)
+- ✅ Wiz Sensor installed
 
 ## Security Warning
 
