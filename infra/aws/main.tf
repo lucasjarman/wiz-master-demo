@@ -209,6 +209,21 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
+data "aws_ami" "ubuntu_lts" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 resource "aws_instance" "demo_app" {
   ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = var.ec2_instance_type
@@ -277,6 +292,71 @@ resource "aws_instance" "demo_app" {
     Name        = "wiz-rsc-demo-${random_id.suffix.hex}"
     Environment = "Demo"
     Project     = "React2Shell"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# 6b. EC2 INSTANCE - UBUNTU (VULNERABLE APP HOST)
+# -----------------------------------------------------------------------------
+resource "aws_instance" "demo_app_ubuntu" {
+  ami                    = data.aws_ami.ubuntu_lts.id
+  instance_type          = var.ec2_instance_type
+  subnet_id              = module.vpc.public_subnets[0]
+  vpc_security_group_ids = [aws_security_group.demo_app.id]
+  iam_instance_profile   = aws_iam_instance_profile.demo_ec2.name
+  key_name               = var.ssh_key_name
+
+  associate_public_ip_address = true
+
+  # INTENTIONAL VULNERABILITY: IMDSv1 enabled for credential theft demo
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "optional"
+    http_put_response_hop_limit = 2
+  }
+
+  # User data script to install Node.js and run app on port 80
+  user_data = <<-EOF
+    #!/bin/bash
+    set -e
+
+    # Update and install dependencies
+    apt-get update
+    apt-get install -y curl git awscli
+
+    # Install Node.js 20 via NodeSource
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+
+    # Clone the app
+    cd /home/ubuntu
+    git clone https://github.com/lucasjarman/wiz-master-demo.git
+    chown -R ubuntu:ubuntu wiz-master-demo
+
+    # Allow Node.js to bind to port 80 without root
+    setcap 'cap_net_bind_service=+ep' $(which node)
+
+    # Create start script
+    cat > /home/ubuntu/start-app.sh << 'SCRIPT'
+    #!/bin/bash
+    cd /home/ubuntu/wiz-master-demo/app/nextjs
+    git pull
+    npm install
+    # IMPORTANT: Must run in dev mode for CVE-2025-66478 exploit to work
+    PORT=80 npm run dev &
+    echo "App (DEV MODE) started at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):80"
+    SCRIPT
+    chmod +x /home/ubuntu/start-app.sh
+    chown ubuntu:ubuntu /home/ubuntu/start-app.sh
+
+    echo "Setup complete. Run ~/start-app.sh to start the app on port 80" > /tmp/setup-complete.txt
+  EOF
+
+  tags = {
+    Name        = "wiz-rsc-demo-ubuntu-${random_id.suffix.hex}"
+    Environment = "Demo"
+    Project     = "React2Shell"
+    OS          = "Ubuntu"
   }
 }
 

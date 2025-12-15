@@ -37,3 +37,18 @@ output "app_url" {
   description = "URL to access the vulnerable demo app"
   value       = "http://${aws_instance.demo_app.public_ip}:3000"
 }
+
+output "ec2_ubuntu_public_ip" {
+  description = "Public IP of the Ubuntu demo EC2 instance"
+  value       = aws_instance.demo_app_ubuntu.public_ip
+}
+
+output "ec2_ubuntu_public_dns" {
+  description = "Public DNS of the Ubuntu demo EC2 instance"
+  value       = aws_instance.demo_app_ubuntu.public_dns
+}
+
+output "app_url_ubuntu" {
+  description = "URL to access the vulnerable demo app on Ubuntu (port 80)"
+  value       = "http://${aws_instance.demo_app_ubuntu.public_ip}"
+}

