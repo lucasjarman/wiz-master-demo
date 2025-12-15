@@ -17,9 +17,17 @@ Demonstrates Wiz platform capabilities:
 ### Attack Path Narrative
 
 ```
-Container:  Internet → EC2:3000 → Docker Container (RCE) → IMDS → IAM Role → S3
-Native:     Internet → EC2:3001 → EC2 Host (RCE)        → IMDS → IAM Role → S3
+Amazon Linux Container:  Internet → 54.206.239.140:3000 → Docker (RCE) → IMDS → IAM Role → S3
+Amazon Linux Native:     Internet → 54.206.239.140:3001 → EC2 Host (RCE) → IMDS → IAM Role → S3
+Ubuntu Native:           Internet → 52.62.49.203:80    → EC2 Host (RCE) → IMDS → IAM Role → S3
 ```
+
+### Static IPs (Elastic IPs for ASM)
+
+| Instance | IP | Ports |
+|----------|-----|-------|
+| Amazon Linux | 54.206.239.140 | 3000 (container), 3001 (native) |
+| Ubuntu | 52.62.49.203 | 80 (native) |
 
 ## Repository Structure
 
@@ -45,9 +53,11 @@ npm run lint         # Run ESLint
 
 ```bash
 cd app/nextjs
-docker build -t wiz-rsc-demo:latest .
+docker build --platform linux/amd64 -t wiz-rsc-demo:latest .
 docker run --rm -p 3000:3000 wiz-rsc-demo:latest
 ```
+
+**Note:** Container runs in dev mode (`npm run dev`) with curl, aws-cli, and bash installed. This is required for CVE-2025-66478 RCE to work - production builds are not vulnerable.
 
 ### Terraform (Infrastructure)
 
@@ -70,12 +80,17 @@ terraform destroy
 
 ### Infrastructure Design
 
-- **EC2 Instance**: Single instance with two deployment options:
-  - **Container (port 3000)**: `~/start-demo.sh` - pulls from ECR, runs in Docker
-  - **Native (port 3001)**: `~/start-native.sh` - clones repo, runs directly on EC2
+- **Amazon Linux EC2** (54.206.239.140):
+  - **Container (port 3000)**: `~/start-demo.sh` - pulls from ECR, runs in Docker (dev mode)
+  - **Native (port 3001)**: `~/start-native.sh` - clones repo, runs `npm run dev`
+  - SSH: `ssh -i wiz-master-demo.pem ec2-user@54.206.239.140`
+- **Ubuntu EC2** (52.62.49.203):
+  - **Native (port 80)**: `~/start-app.sh` - clones repo, runs `npm run dev`
+  - SSH: `ssh -i wiz-master-demo.pem ubuntu@52.62.49.203`
 - **Over-permissive IAM**: Instance profile has S3 read access (lateral movement path)
-- **Public S3 bucket**: Contains fake sensitive data (`employees.json`, `roadmap_2025_confidential.txt`)
-- **IMDSv1 enabled**: Allows credential theft from both container and native app
+- **Public S3 bucket**: Contains fake PII, medical records, API keys
+- **IMDSv1 enabled**: Allows credential theft from container and native apps
+- **Elastic IPs**: Static IPs for ASM tracking
 
 ### App Routes
 
@@ -130,13 +145,31 @@ Content-Disposition: form-data; name="2"\r
 
 ## Current State
 
-- ✅ Next.js app scaffolded with vulnerable versions
-- ✅ Docker build working (port 3000)
-- ✅ Native EC2 deployment option (port 3001)
-- ✅ Terraform for EC2 + S3 + IAM
-- ✅ S3 bucket with fake sensitive data
+- ✅ Next.js app with vulnerable versions (Next.js 16.0.6, React 19.2.0)
+- ✅ Amazon Linux EC2 with container (port 3000) and native (port 3001)
+- ✅ Ubuntu EC2 with native app (port 80)
+- ✅ Docker container runs in dev mode (RCE works)
+- ✅ Elastic IPs for stable ASM tracking
+- ✅ Terraform for EC2 + S3 + IAM + CloudTrail + VPC Flow Logs
+- ✅ S3 bucket with fake PII, medical records, API keys
 - ✅ RCE exploit works (CVE-2025-66478)
+- ✅ Demo script (`wiz-demo.sh`) with 17 attack patterns
 - ✅ Wiz Sensor installed
+
+## Demo Script
+
+Run the consolidated attack demo:
+
+```bash
+./wiz-demo.sh <target-ip> <port>
+
+# Examples:
+./wiz-demo.sh 54.206.239.140 3000   # Amazon Linux container
+./wiz-demo.sh 54.206.239.140 3001   # Amazon Linux native
+./wiz-demo.sh 52.62.49.203 80       # Ubuntu native
+```
+
+The script executes 17 attack patterns including RCE, IMDS credential theft, S3 enumeration, OAST callbacks, and persistence mechanisms.
 
 ## Security Warning
 
