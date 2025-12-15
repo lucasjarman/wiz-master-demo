@@ -38,3 +38,4 @@ GEMINI.md
 
 # SSH Keys
 *.pem
+infra/aws/tfplan
