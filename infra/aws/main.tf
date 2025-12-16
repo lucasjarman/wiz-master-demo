@@ -61,47 +61,32 @@ module "vpc" {
 }
 
 # -----------------------------------------------------------------------------
-# 4. SECURITY GROUP (EC2 ACCESS)
+# 4. SECURITY GROUP (EC2 ACCESS) - WHITELISTED IPs ONLY
 # -----------------------------------------------------------------------------
+locals {
+  allowed_ips = [
+    "119.17.156.157/32",  # Lucas
+    "54.153.167.0/32",    # Wiz Scanner
+    "54.206.253.144/32",  # Wiz Scanner
+    "54.66.162.244/32",   # Wiz Scanner
+    "13.238.102.51/32",   # Wiz Scanner
+    "54.66.150.182/32",   # Wiz Scanner
+    "3.24.191.170/32",    # Wiz Scanner
+  ]
+}
+
 resource "aws_security_group" "demo_app" {
   name        = "wiz-demo-app-sg-${random_id.suffix.hex}"
   description = "Security group for vulnerable demo app"
   vpc_id      = module.vpc.vpc_id
 
-  # SSH access
+  # Allow all traffic from whitelisted IPs only
   ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # HTTP access (port 80)
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # App access (port 3000 - container)
-  ingress {
-    description = "App Container"
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # App access (port 3001 - native)
-  ingress {
-    description = "App Native"
-    from_port   = 3001
-    to_port     = 3001
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    description = "All traffic from whitelisted IPs"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = local.allowed_ips
   }
 
   # All outbound traffic
