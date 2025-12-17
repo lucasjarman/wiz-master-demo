@@ -1,0 +1,91 @@
+# -----------------------------------------------------------------------------
+# Wiz Demo - Wiz Sensor Installation
+# -----------------------------------------------------------------------------
+# Installs Wiz Runtime Sensor on EKS cluster via Helm.
+# Run manually after EKS cluster is ready.
+#
+# Required GitHub Secrets:
+#   AWS_ACCESS_KEY_ID     - AWS credentials
+#   AWS_SECRET_ACCESS_KEY - AWS credentials
+#   WIZ_CLIENT_ID         - Wiz service account ID
+#   WIZ_CLIENT_TOKEN      - Wiz service account token
+#   WIZ_ENDPOINT          - Wiz API endpoint (e.g., api.us1.app.wiz.io)
+# -----------------------------------------------------------------------------
+
+name: Install Wiz Sensor
+
+on:
+  workflow_dispatch:  # Manual trigger only
+    inputs:
+      cluster_name:
+        description: 'EKS cluster name (leave empty for auto-detect)'
+        required: false
+        default: ''
+
+env:
+  AWS_REGION: ap-southeast-2
+
+jobs:
+  install-sensor:
+    name: Install Wiz Sensor
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get EKS cluster name
+        id: eks
+        run: |
+          if [ -n "${{ github.event.inputs.cluster_name }}" ]; then
+            CLUSTER_NAME="${{ github.event.inputs.cluster_name }}"
+          else
+            CLUSTER_NAME=$(aws eks list-clusters --query "clusters[?starts_with(@, 'wiz-rsc-demo-eks')]" --output text | head -1)
+          fi
+          echo "cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
+          echo "Detected cluster: $CLUSTER_NAME"
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ steps.eks.outputs.cluster_name }} --region ${{ env.AWS_REGION }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Add Wiz Helm repo
+        run: |
+          helm repo add wiz-sec https://wiz-sec.github.io/charts
+          helm repo update
+
+      - name: Install Wiz Sensor
+        run: |
+          helm upgrade --install wiz-sensor wiz-sec/wiz-sensor \
+            --namespace wiz \
+            --create-namespace \
+            --set wizApiToken.clientId="${{ secrets.WIZ_CLIENT_ID }}" \
+            --set wizApiToken.clientToken="${{ secrets.WIZ_CLIENT_TOKEN }}" \
+            --set wizApiToken.clientEndpoint="${{ secrets.WIZ_ENDPOINT }}" \
+            --set sensorClusterName="${{ steps.eks.outputs.cluster_name }}" \
+            --wait \
+            --timeout 5m
+
+      - name: Verify Installation
+        run: |
+          echo "## Wiz Sensor Installation Complete! 🛡️" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster:** ${{ steps.eks.outputs.cluster_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Sensor Pods" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n wiz >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+

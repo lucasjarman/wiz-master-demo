@@ -1,0 +1,125 @@
+# -----------------------------------------------------------------------------
+# Wiz Demo - CI/CD Pipeline
+# -----------------------------------------------------------------------------
+# Builds Docker image, pushes to ECR, and deploys to EKS.
+# Triggered on push to main branch.
+#
+# Required GitHub Secrets:
+#   AWS_ACCESS_KEY_ID     - AWS credentials for deployment
+#   AWS_SECRET_ACCESS_KEY - AWS credentials for deployment
+#   WIZ_CLIENT_ID         - Wiz sensor service account ID
+#   WIZ_CLIENT_TOKEN      - Wiz sensor service account token
+#   WIZ_ENDPOINT          - Wiz API endpoint (e.g., api.us1.app.wiz.io)
+# -----------------------------------------------------------------------------
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'infra/k8s/**'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  AWS_REGION: ap-southeast-2
+  EKS_CLUSTER_NAME: ""  # Set by Terraform output
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build and Push Docker Image
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.build.outputs.image_tag }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get ECR repository URL
+        id: ecr
+        run: |
+          # Get ECR URL from Terraform output or find by prefix
+          ECR_URL=$(aws ecr describe-repositories --query "repositories[?starts_with(repositoryName, 'wiz-rsc-demo-app')].repositoryUri" --output text | head -1)
+          echo "ecr_url=$ECR_URL" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        id: build
+        working-directory: app/nextjs
+        run: |
+          IMAGE_TAG="${{ steps.ecr.outputs.ecr_url }}:${{ github.sha }}"
+          IMAGE_LATEST="${{ steps.ecr.outputs.ecr_url }}:latest"
+          
+          docker build --platform linux/amd64 -t $IMAGE_TAG -t $IMAGE_LATEST .
+          docker push $IMAGE_TAG
+          docker push $IMAGE_LATEST
+          
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  # ---------------------------------------------------------------------------
+  # Deploy to EKS
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to EKS
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get EKS cluster name
+        id: eks
+        run: |
+          CLUSTER_NAME=$(aws eks list-clusters --query "clusters[?starts_with(@, 'wiz-rsc-demo-eks')]" --output text | head -1)
+          echo "cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ steps.eks.outputs.cluster_name }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy to Kubernetes
+        working-directory: infra/k8s
+        run: |
+          # Apply namespace and deployment
+          kubectl apply -f deployment.yaml
+          
+          # Update image
+          kubectl set image deployment/wiz-rsc-demo -n wiz-demo \
+            nextjs=${{ needs.build.outputs.image_tag }}
+          
+          # Apply service
+          kubectl apply -f service.yaml
+          
+          # Wait for rollout
+          kubectl rollout status deployment/wiz-rsc-demo -n wiz-demo --timeout=120s
+
+      - name: Get deployment URL
+        run: |
+          echo "## Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          LB_URL=$(kubectl get svc wiz-rsc-demo -n wiz-demo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "**App URL:** http://$LB_URL" >> $GITHUB_STEP_SUMMARY
+
