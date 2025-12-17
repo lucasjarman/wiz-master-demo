@@ -13,22 +13,41 @@ locals {
 # -----------------------------------------------------------------------------
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"
+  version = "~> 21.0"
 
   count = var.enable_eks ? 1 : 0
 
-  cluster_name    = local.eks_cluster_name
-  cluster_version = var.eks_cluster_version
+  # v21 renamed: cluster_name -> name, cluster_version -> kubernetes_version
+  name               = local.eks_cluster_name
+  kubernetes_version = var.eks_cluster_version
 
   # Network configuration
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
   # Allow public access to cluster endpoint for demo simplicity
-  cluster_endpoint_public_access = true
+  # v21 renamed: cluster_endpoint_public_access -> endpoint_public_access
+  endpoint_public_access = true
 
   # Enable cluster creator admin permissions
   enable_cluster_creator_admin_permissions = true
+
+  # Control plane logging for Wiz visibility
+  enabled_log_types = ["api", "audit", "authenticator"]
+
+  # Required EKS Addons - these are NOT installed by default in v21
+  addons = {
+    vpc-cni = {
+      before_compute = true
+      most_recent    = true
+    }
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+  }
 
   # Managed node group
   eks_managed_node_groups = {

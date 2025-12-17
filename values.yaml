@@ -1,0 +1,22 @@
+global:
+  wizApiToken:
+    secret:
+      create: false
+      name: wiz-api-token
+ 
+wiz-kubernetes-connector:
+  enabled: true
+  autoCreateConnector:
+    clusterFlavor: EKS
+  wiz-broker:
+    enabled: true
+ 
+wiz-sensor:
+  enabled: true
+  imagePullSecret:
+    create: false
+    name: sensor-image-pull
+ 
+wiz-admission-controller:
+  enabled: true
+

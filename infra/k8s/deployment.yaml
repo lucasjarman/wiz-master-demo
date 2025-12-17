@@ -32,9 +32,7 @@ spec:
     spec:
       containers:
         - name: nextjs
-          # Image will be set via kustomize or sed during deployment
-          # Format: <account>.dkr.ecr.<region>.amazonaws.com/wiz-rsc-demo-app-<suffix>:latest
-          image: IMAGE_PLACEHOLDER
+          image: 079942904060.dkr.ecr.ap-southeast-2.amazonaws.com/wiz-rsc-demo-app-wiz-e624d66e:latest
           ports:
             - containerPort: 3000
               name: http
@@ -63,6 +61,7 @@ spec:
               value: "production"
             - name: PORT
               value: "3000"
-      # No service account needed - using node IAM role via IMDS
-      automountServiceAccountToken: false
+      # INTENTIONALLY INSECURE: Mount service account token for demo
+      # This allows K8s API access from within the pod (lateral movement)
+      automountServiceAccountToken: true
 
