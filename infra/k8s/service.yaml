@@ -1,0 +1,32 @@
+# Wiz RSC Demo - LoadBalancer Service
+# Exposes the vulnerable app via AWS Network Load Balancer
+# NLB provides direct TCP/TLS passthrough to pods
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wiz-rsc-demo
+  namespace: wiz-demo
+  labels:
+    app: wiz-rsc-demo
+    environment: demo
+  annotations:
+    # Use NLB instead of Classic Load Balancer
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    # Internet-facing (not internal)
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    # Cross-zone load balancing
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    # Health check configuration
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+spec:
+  type: LoadBalancer
+  selector:
+    app: wiz-rsc-demo
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+

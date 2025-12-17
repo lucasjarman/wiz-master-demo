@@ -20,3 +20,24 @@ variable "ssh_key_name" {
   description = "Name of existing EC2 key pair for SSH access"
   type        = string
 }
+
+# -----------------------------------------------------------------------------
+# EKS Variables
+# -----------------------------------------------------------------------------
+variable "enable_eks" {
+  description = "Enable EKS cluster deployment (adds NAT gateway cost)"
+  type        = bool
+  default     = false
+}
+
+variable "eks_cluster_version" {
+  description = "Kubernetes version for EKS cluster"
+  type        = string
+  default     = "1.32"
+}
+
+variable "eks_node_instance_type" {
+  description = "Instance type for EKS node group"
+  type        = string
+  default     = "t3.medium"
+}

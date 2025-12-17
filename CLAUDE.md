@@ -155,6 +155,55 @@ Content-Disposition: form-data; name="2"\r
 - ✅ RCE exploit works (CVE-2025-66478)
 - ✅ Demo script (`wiz-demo.sh`) with 17 attack patterns
 - ✅ Wiz Sensor installed
+- ✅ EKS deployment option (feature/eks-deployment branch)
+
+## EKS Deployment (Optional)
+
+EKS runs in parallel with EC2. Enable with `enable_eks=true` in terraform.tfvars.
+
+### EKS Attack Path
+
+```
+Internet → NLB:80 → EKS Pod (RCE) → IMDS (IMDSv1) → Node IAM Role → S3
+```
+
+### Deploy to EKS
+
+```bash
+# 1. Enable EKS in terraform.tfvars
+echo 'enable_eks = true' >> infra/aws/terraform.tfvars
+
+# 2. Apply Terraform (creates EKS cluster ~15 min)
+cd infra/aws
+terraform apply
+
+# 3. Deploy app to EKS
+cd infra/k8s
+./deploy.sh
+
+# 4. Get the NLB URL
+kubectl get svc wiz-rsc-demo -n wiz-demo
+```
+
+### EKS Configuration
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| Cluster Version | 1.32 | Standard support until March 2026 |
+| Node Instance | t3.medium | 2 vCPU, 4GB RAM |
+| Node IMDS | IMDSv1 enabled | Credential theft via 169.254.169.254 |
+| Node IAM | S3 read access | Same permissions as EC2 for lateral movement |
+| Ingress | NLB (LoadBalancer Service) | Direct TCP to pods on port 80 |
+
+### EKS Files
+
+```
+infra/aws/eks.tf           # EKS cluster, node group, IAM
+infra/aws/variables.tf     # enable_eks, eks_cluster_version, eks_node_instance_type
+infra/k8s/deployment.yaml  # Kubernetes Deployment + Namespace
+infra/k8s/service.yaml     # LoadBalancer Service (NLB)
+infra/k8s/deploy.sh        # Build, push, deploy script
+```
 
 ## Demo Script
 
@@ -167,6 +216,7 @@ Run the consolidated attack demo:
 ./wiz-demo.sh 54.206.239.140 3000   # Amazon Linux container
 ./wiz-demo.sh 54.206.239.140 3001   # Amazon Linux native
 ./wiz-demo.sh 52.62.49.203 80       # Ubuntu native
+./wiz-demo.sh <nlb-hostname> 80     # EKS via NLB
 ```
 
 The script executes 17 attack patterns including RCE, IMDS credential theft, S3 enumeration, OAST callbacks, and persistence mechanisms.

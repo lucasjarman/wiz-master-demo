@@ -45,14 +45,27 @@ module "vpc" {
   name = "wiz-rsc-demo-vpc-${random_id.suffix.hex}"
   cidr = "10.0.0.0/16"
 
-  azs            = ["${var.aws_region}a", "${var.aws_region}b", "${var.aws_region}c"]
-  public_subnets = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  azs             = ["${var.aws_region}a", "${var.aws_region}b", "${var.aws_region}c"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  private_subnets = var.enable_eks ? ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"] : []
 
-  # No private subnets needed for simple EC2 demo
-  enable_nat_gateway = false
+  # NAT Gateway only needed for EKS (nodes in private subnets need internet access)
+  enable_nat_gateway = var.enable_eks
+  single_nat_gateway = true  # Cost optimization for demo
 
   enable_dns_hostnames = true
   enable_dns_support   = true
+
+  # Tags required for EKS to discover subnets
+  public_subnet_tags = var.enable_eks ? {
+    "kubernetes.io/role/elb"                                 = 1
+    "kubernetes.io/cluster/wiz-rsc-demo-eks-${random_id.suffix.hex}" = "shared"
+  } : {}
+
+  private_subnet_tags = var.enable_eks ? {
+    "kubernetes.io/role/internal-elb"                        = 1
+    "kubernetes.io/cluster/wiz-rsc-demo-eks-${random_id.suffix.hex}" = "shared"
+  } : {}
 
   tags = {
     Environment = "Demo"
