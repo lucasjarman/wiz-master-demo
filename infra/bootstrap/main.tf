@@ -46,7 +46,7 @@ variable "aws_profile" {
 variable "state_bucket_name" {
   description = "Name of the S3 bucket for Terraform state"
   type        = string
-  default     = "wiz-demo-terraform-state"
+  default     = "wiz-demo-tfstate-lucasjarman"
 }
 
 variable "dynamodb_table_name" {
