@@ -797,6 +797,8 @@ resource "aws_s3_bucket_notification" "cloudtrail_notification" {
     topic_arn = "arn:aws:sns:ap-southeast-2:079942904060:wiz-cloudtrail-logs-notify"
     events    = ["s3:ObjectCreated:*"]
   }
+
+  depends_on = [null_resource.update_sns_cloudtrail]
 }
 
 resource "aws_s3_bucket_notification" "vpc_flow_logs_notification" {
@@ -806,6 +808,8 @@ resource "aws_s3_bucket_notification" "vpc_flow_logs_notification" {
     topic_arn = "arn:aws:sns:ap-southeast-2:079942904060:wiz-vpcflow-logs-notify"
     events    = ["s3:ObjectCreated:*"]
   }
+
+  depends_on = [null_resource.update_sns_vpcflow]
 }
 
 resource "aws_s3_bucket_notification" "dns_logs_notification" {
@@ -814,5 +818,43 @@ resource "aws_s3_bucket_notification" "dns_logs_notification" {
   topic {
     topic_arn = "arn:aws:sns:ap-southeast-2:079942904060:wiz-bucket-notification-topic-route-53-logs"
     events    = ["s3:ObjectCreated:*"]
+  }
+
+  depends_on = [null_resource.update_sns_dns]
+}
+
+# -----------------------------------------------------------------------------
+# 13. SNS POLICY UPDATER (Automation Hook)
+# -----------------------------------------------------------------------------
+# Updates the existing CloudFormation-managed SNS policies to allow
+# the new Terraform-managed S3 buckets to publish events.
+
+resource "null_resource" "update_sns_cloudtrail" {
+  triggers = {
+    bucket_arn = aws_s3_bucket.cloudtrail_logs.arn
+  }
+
+  provisioner "local-exec" {
+    command = "bash update_sns_policy.sh arn:aws:sns:ap-southeast-2:079942904060:wiz-cloudtrail-logs-notify ${aws_s3_bucket.cloudtrail_logs.arn} ${var.aws_profile}"
+  }
+}
+
+resource "null_resource" "update_sns_vpcflow" {
+  triggers = {
+    bucket_arn = aws_s3_bucket.vpc_flow_logs.arn
+  }
+
+  provisioner "local-exec" {
+    command = "bash update_sns_policy.sh arn:aws:sns:ap-southeast-2:079942904060:wiz-vpcflow-logs-notify ${aws_s3_bucket.vpc_flow_logs.arn} ${var.aws_profile}"
+  }
+}
+
+resource "null_resource" "update_sns_dns" {
+  triggers = {
+    bucket_arn = aws_s3_bucket.dns_query_logs.arn
+  }
+
+  provisioner "local-exec" {
+    command = "bash update_sns_policy.sh arn:aws:sns:ap-southeast-2:079942904060:wiz-bucket-notification-topic-route-53-logs ${aws_s3_bucket.dns_query_logs.arn} ${var.aws_profile}"
   }
 }
