@@ -858,3 +858,20 @@ resource "null_resource" "update_sns_dns" {
     command = "bash update_sns_policy.sh arn:aws:sns:ap-southeast-2:079942904060:wiz-bucket-notification-topic-route-53-logs ${aws_s3_bucket.dns_query_logs.arn} ${var.aws_profile}"
   }
 }
+
+# -----------------------------------------------------------------------------
+# 14. EKS AUDIT LOG INTEGRATION (CloudWatch -> Kinesis)
+# -----------------------------------------------------------------------------
+# Wires the new EKS cluster's log group to the existing Wiz Kinesis Firehose
+# destination created by CloudFormation.
+
+resource "aws_cloudwatch_log_subscription_filter" "eks_audit_logs" {
+  count           = var.enable_eks ? 1 : 0
+  name            = "eks-audit-logs-to-wiz"
+  log_group_name  = "/aws/eks/${module.eks[0].cluster_name}/cluster"
+  filter_pattern  = ""
+  destination_arn = "arn:aws:logs:ap-southeast-2:079942904060:destination:WizEksLogsDestination-ap-southeast-2"
+  role_arn        = "arn:aws:iam::079942904060:role/WizCloudWatchLogsSubscriptionRole"
+
+  depends_on = [module.eks]
+}
