@@ -74,6 +74,7 @@ kubectl set image deployment/wiz-rsc-demo -n wiz-demo nextjs="$ECR_URL:latest" 2
 
 # Apply service
 kubectl apply -f infra/k8s/service.yaml
+kubectl apply -f infra/k8s/rbac.yaml
 
 echo "Waiting for LoadBalancer IP..."
 kubectl rollout status deployment/wiz-rsc-demo -n wiz-demo --timeout=120s

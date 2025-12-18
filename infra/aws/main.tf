@@ -223,6 +223,7 @@ data "aws_ami" "ubuntu_lts" {
 }
 
 resource "aws_instance" "demo_app" {
+  count = var.enable_ec2_demo ? 1 : 0
   ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = var.ec2_instance_type
   subnet_id              = module.vpc.public_subnets[0]
@@ -298,6 +299,7 @@ resource "aws_instance" "demo_app" {
 # 6b. EC2 INSTANCE - UBUNTU (VULNERABLE APP HOST)
 # -----------------------------------------------------------------------------
 resource "aws_instance" "demo_app_ubuntu" {
+  count = var.enable_ec2_demo ? 1 : 0
   ami                    = data.aws_ami.ubuntu_lts.id
   instance_type          = var.ec2_instance_type
   subnet_id              = module.vpc.public_subnets[0]
@@ -364,7 +366,8 @@ resource "aws_instance" "demo_app_ubuntu" {
 # 6c. ELASTIC IPs (STATIC IPs FOR ASM)
 # -----------------------------------------------------------------------------
 resource "aws_eip" "demo_app" {
-  instance = aws_instance.demo_app.id
+  count    = var.enable_ec2_demo ? 1 : 0
+  instance = aws_instance.demo_app[0].id
   domain   = "vpc"
 
   tags = {
@@ -374,7 +377,8 @@ resource "aws_eip" "demo_app" {
 }
 
 resource "aws_eip" "demo_app_ubuntu" {
-  instance = aws_instance.demo_app_ubuntu.id
+  count    = var.enable_ec2_demo ? 1 : 0
+  instance = aws_instance.demo_app_ubuntu[0].id
   domain   = "vpc"
 
   tags = {
