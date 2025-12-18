@@ -32,7 +32,7 @@ spec:
     spec:
       containers:
         - name: nextjs
-          image: 079942904060.dkr.ecr.ap-southeast-2.amazonaws.com/wiz-rsc-demo-app-wiz-e624d66e:latest
+          image: IMAGE_PLACEHOLDER
           ports:
             - containerPort: 3000
               name: http

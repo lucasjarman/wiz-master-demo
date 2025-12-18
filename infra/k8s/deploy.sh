@@ -68,13 +68,12 @@ cd "$SCRIPT_DIR"
 # Create namespace if not exists
 kubectl apply -f deployment.yaml
 
-# Update image in deployment and apply
-kubectl set image deployment/wiz-rsc-demo -n wiz-demo nextjs="$ECR_URL:latest" 2>/dev/null || \
-    sed "s|IMAGE_PLACEHOLDER|$ECR_URL:latest|g" deployment.yaml | kubectl apply -f -
+# Inject ECR URL into deployment and apply
+sed "s|IMAGE_PLACEHOLDER|$ECR_URL:latest|g" deployment.yaml | kubectl apply -f -
 
 # Apply service
-kubectl apply -f infra/k8s/service.yaml
-kubectl apply -f infra/k8s/rbac.yaml
+kubectl apply -f service.yaml
+kubectl apply -f rbac.yaml
 
 echo "Waiting for LoadBalancer IP..."
 kubectl rollout status deployment/wiz-rsc-demo -n wiz-demo --timeout=120s
