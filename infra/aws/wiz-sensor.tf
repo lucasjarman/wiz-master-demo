@@ -49,7 +49,7 @@ resource "kubernetes_secret" "sensor_image_pull" {
   data = {
     ".dockerconfigjson" = jsonencode({
       auths = {
-        "wizio.azurecr.io/sensor" = {
+        "wizio.azurecr.io" = {
           auth = base64encode("${var.wiz_sensor_pull_user}:${var.wiz_sensor_pull_password}")
         }
       }

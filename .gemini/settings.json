@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "wizaus": {
+      "url": "https://mcp.app.wiz.io/",
+      "type": "http"
+    }
+  }
+}
