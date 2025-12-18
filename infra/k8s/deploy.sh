@@ -26,7 +26,7 @@ echo ""
 echo -e "${YELLOW}[1/5] Getting Terraform outputs...${NC}"
 cd "$TF_DIR"
 ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null || echo "")
-AWS_REGION=$(terraform output -raw aws_region 2>/dev/null || grep -A1 'aws_region' terraform.tfvars | tail -1 | tr -d ' "' || echo "ap-southeast-2")
+AWS_REGION=$(terraform output -raw aws_region 2>/dev/null || echo "ap-southeast-2")
 EKS_CLUSTER=$(terraform output -raw eks_cluster_name 2>/dev/null || echo "")
 
 if [ -z "$ECR_URL" ]; then
@@ -51,14 +51,14 @@ docker build --platform linux/amd64 -t wiz-rsc-demo:latest .
 echo ""
 
 echo -e "${YELLOW}[3/5] Pushing to ECR...${NC}"
-aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_URL"
+aws ecr get-login-password --region "$AWS_REGION" --profile wiz-demo | docker login --username AWS --password-stdin "$ECR_URL"
 docker tag wiz-rsc-demo:latest "$ECR_URL:latest"
 docker push "$ECR_URL:latest"
 echo ""
 
 # Update kubeconfig
 echo -e "${YELLOW}[4/5] Configuring kubectl...${NC}"
-aws eks update-kubeconfig --name "$EKS_CLUSTER" --region "$AWS_REGION"
+aws eks update-kubeconfig --name "$EKS_CLUSTER" --region "$AWS_REGION" --profile wiz-demo
 echo ""
 
 # Deploy to Kubernetes
