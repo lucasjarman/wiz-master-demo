@@ -22,6 +22,15 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
 spec:
   type: LoadBalancer
+  # Restrict access to trusted IPs (Lucas + Wiz Scanners)
+  loadBalancerSourceRanges:
+    - "119.17.156.157/32"
+    - "54.153.167.0/32"
+    - "54.206.253.144/32"
+    - "54.66.162.244/32"
+    - "13.238.102.51/32"
+    - "54.66.150.182/32"
+    - "3.24.191.170/32"
   selector:
     app: wiz-rsc-demo
   ports:

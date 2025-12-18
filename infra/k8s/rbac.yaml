@@ -1,0 +1,16 @@
+# Wiz RSC Demo - Intentionally Over-Permissive RBAC
+# Grants 'view' permissions to the default service account in wiz-demo namespace
+# allowing the attacker (demo script) to enumerate K8s resources.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wiz-demo-view-binding
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: wiz-demo
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io

