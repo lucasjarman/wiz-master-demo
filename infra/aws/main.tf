@@ -784,3 +784,33 @@ resource "aws_ecr_repository" "app_repo" {
     Environment = "Demo"
   }
 }
+
+# -----------------------------------------------------------------------------
+# 12. WIZ LOGGING INTEGRATION (S3 -> SQS)
+# -----------------------------------------------------------------------------
+resource "aws_s3_bucket_notification" "cloudtrail_notification" {
+  bucket = aws_s3_bucket.cloudtrail_logs.id
+
+  queue {
+    queue_arn     = "arn:aws:sqs:ap-southeast-2:079942904060:wiz-cloudtrail-logs-queue"
+    events        = ["s3:ObjectCreated:*"]
+  }
+}
+
+resource "aws_s3_bucket_notification" "vpc_flow_logs_notification" {
+  bucket = aws_s3_bucket.vpc_flow_logs.id
+
+  queue {
+    queue_arn     = "arn:aws:sqs:ap-southeast-2:079942904060:wiz-vpcflow-logs-queue"
+    events        = ["s3:ObjectCreated:*"]
+  }
+}
+
+resource "aws_s3_bucket_notification" "dns_logs_notification" {
+  bucket = aws_s3_bucket.dns_query_logs.id
+
+  queue {
+    queue_arn     = "arn:aws:sqs:ap-southeast-2:079942904060:wiz-bucket-notification-queue-route53-logs"
+    events        = ["s3:ObjectCreated:*"]
+  }
+}
