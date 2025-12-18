@@ -1,6 +1,6 @@
 # Wiz RSC Demo - Kubernetes Deployment
 # Deploys the vulnerable Next.js application to EKS
-# Attack path: NLB → Pod (RCE via CVE-2025-66478) → IMDS → Node IAM Role → S3
+# Attack path: NLB → Pod (RCE via CVE-2025-66478) → ServiceAccount (IRSA) → S3
 ---
 apiVersion: v1
 kind: Namespace
@@ -30,6 +30,7 @@ spec:
         app: wiz-rsc-demo
         environment: demo
     spec:
+      serviceAccountName: wiz-rsc-sa
       containers:
         - name: nextjs
           image: IMAGE_PLACEHOLDER

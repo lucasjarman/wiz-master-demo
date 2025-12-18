@@ -32,6 +32,9 @@ module "eks" {
   # Enable cluster creator admin permissions
   enable_cluster_creator_admin_permissions = true
 
+  # Enable IRSA (OIDC Provider) for Service Accounts
+  enable_irsa = true
+
   # Control plane logging for Wiz visibility
   enabled_log_types = ["api", "audit", "authenticator"]
 
@@ -71,10 +74,11 @@ module "eks" {
         http_put_response_hop_limit = 2
       }
 
-      # Attach our custom IAM policy for S3 access (lateral movement)
-      iam_role_additional_policies = {
-        s3_access = aws_iam_policy.eks_node_s3_access[0].arn
-      }
+      # REMOVED: Node-level S3 access. 
+      # Now using IRSA (Pod-level access) to satisfy Wiz Graph Control requirements.
+      # iam_role_additional_policies = {
+      #   s3_access = aws_iam_policy.eks_node_s3_access[0].arn
+      # }
 
       # Labels for easy identification
       labels = {
@@ -93,6 +97,51 @@ module "eks" {
     Environment = "Demo"
     Project     = "React2Shell"
   }
+}
+
+# -----------------------------------------------------------------------------
+# IRSA: IAM Role for Service Account (Pod Identity)
+# -----------------------------------------------------------------------------
+# Trust policy allowing the OIDC provider to assume this role
+# Scope: system:serviceaccount:wiz-demo:wiz-rsc-sa
+data "aws_iam_policy_document" "oidc_assume_role" {
+  count = var.enable_eks ? 1 : 0
+
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks[0].oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${module.eks[0].oidc_provider}:sub"
+      values   = ["system:serviceaccount:wiz-demo:wiz-rsc-sa"]
+    }
+  }
+}
+
+resource "aws_iam_role" "irsa_s3_role" {
+  count = var.enable_eks ? 1 : 0
+
+  name               = "wiz-rsc-sa-role-${random_id.suffix.hex}"
+  assume_role_policy = data.aws_iam_policy_document.oidc_assume_role[0].json
+
+  tags = {
+    Environment = "Demo"
+    Project     = "React2Shell"
+    Type        = "IRSA"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "irsa_s3_access" {
+  count = var.enable_eks ? 1 : 0
+
+  policy_arn = aws_iam_policy.eks_node_s3_access[0].arn
+  role       = aws_iam_role.irsa_s3_role[0].name
 }
 
 # -----------------------------------------------------------------------------
