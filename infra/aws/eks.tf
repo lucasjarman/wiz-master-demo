@@ -179,34 +179,5 @@ resource "aws_iam_policy" "eks_node_s3_access" {
   }
 }
 
-# -----------------------------------------------------------------------------
-# Security Group for EKS NLB (allow whitelisted IPs only)
-# -----------------------------------------------------------------------------
-resource "aws_security_group" "eks_nlb" {
-  count = var.enable_eks ? 1 : 0
 
-  name        = "wiz-demo-eks-nlb-sg-${random_id.suffix.hex}"
-  description = "Security group for EKS NLB - whitelisted IPs only"
-  vpc_id      = module.vpc.vpc_id
-
-  ingress {
-    description = "HTTP from whitelisted IPs"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = local.allowed_ips
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name        = "wiz-demo-eks-nlb-sg"
-    Environment = "Demo"
-  }
-}
 
