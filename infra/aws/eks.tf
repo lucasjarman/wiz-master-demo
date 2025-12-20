@@ -168,40 +168,7 @@ resource "aws_iam_role_policy" "irsa_s3_full_access" {
 # resource "aws_iam_role_policy_attachment" "irsa_s3_access" { ... }
 # resource "aws_iam_role_policy_attachment" "irsa_admin_access" { ... }
 
-# -----------------------------------------------------------------------------
-# EKS Node IAM Policy for S3 Access (Lateral Movement)
-# -----------------------------------------------------------------------------
-# INTENTIONAL VULNERABILITY: Over-permissive IAM - same as EC2 role
-resource "aws_iam_policy" "eks_node_s3_access" {
-  count = var.enable_eks ? 1 : 0
 
-  name        = "wiz-demo-eks-node-s3-access-${random_id.suffix.hex}"
-  description = "Allow EKS nodes to read sensitive S3 bucket (intentionally over-permissive)"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "s3:ListBucket",
-          "s3:GetObject",
-          "s3:ListAllMyBuckets"
-        ]
-        Effect = "Allow"
-        Resource = [
-          aws_s3_bucket.sensitive_data.arn,
-          "${aws_s3_bucket.sensitive_data.arn}/*",
-          "arn:aws:s3:::*"
-        ]
-      }
-    ]
-  })
-
-  tags = {
-    Environment   = "Demo"
-    Vulnerability = "OverPermissive"
-  }
-}
 
 
 
