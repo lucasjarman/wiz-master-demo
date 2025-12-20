@@ -118,6 +118,12 @@ data "aws_iam_policy_document" "oidc_assume_role" {
 
     condition {
       test     = "StringEquals"
+      variable = "${module.eks[0].oidc_provider}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
       variable = "${module.eks[0].oidc_provider}:sub"
       values   = ["system:serviceaccount:wiz-demo:wiz-rsc-sa"]
     }
