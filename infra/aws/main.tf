@@ -101,31 +101,15 @@ resource "aws_s3_bucket" "sensitive_data" {
 resource "aws_s3_bucket_public_access_block" "sensitive_data" {
   bucket = aws_s3_bucket.sensitive_data.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
-# Public Read Policy
-resource "aws_s3_bucket_policy" "sensitive_data" {
-  bucket = aws_s3_bucket.sensitive_data.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "PublicReadGetObject"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "s3:GetObject"
-        Resource  = "${aws_s3_bucket.sensitive_data.arn}/*"
-      },
-    ]
-  })
-
-  depends_on = [aws_s3_bucket_public_access_block.sensitive_data]
-}
+# REMOVED: Public Read Policy
+# Access is now controlled solely via IAM Roles (IRSA) for Wiz detection
+# resource "aws_s3_bucket_policy" "sensitive_data" { ... }
 
 # Fake Sensitive Data Objects - Enhanced with PII patterns for Wiz detection
 resource "aws_s3_object" "employees" {
