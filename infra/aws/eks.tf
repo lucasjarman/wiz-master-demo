@@ -144,6 +144,15 @@ resource "aws_iam_role_policy_attachment" "irsa_s3_access" {
   role       = aws_iam_role.irsa_s3_role[0].name
 }
 
+# INTENTIONAL VULNERABILITY: AdministratorAccess for Demo Reliability
+# Ensures Wiz Graph immediately draws "High Privilege" links.
+resource "aws_iam_role_policy_attachment" "irsa_admin_access" {
+  count = var.enable_eks ? 1 : 0
+
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+  role       = aws_iam_role.irsa_s3_role[0].name
+}
+
 # -----------------------------------------------------------------------------
 # EKS Node IAM Policy for S3 Access (Lateral Movement)
 # -----------------------------------------------------------------------------

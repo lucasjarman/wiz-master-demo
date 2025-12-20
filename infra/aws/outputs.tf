@@ -27,34 +27,3 @@ output "eks_cluster_endpoint" {
   description = "Endpoint for EKS control plane"
   value       = try(module.eks[0].cluster_endpoint, "")
 }
-
-# Conditional EC2 Outputs
-output "ec2_public_ip" {
-  description = "Public IP of Amazon Linux instance"
-  value       = length(aws_eip.demo_app) > 0 ? aws_eip.demo_app[0].public_ip : ""
-}
-
-output "ec2_public_dns" {
-  description = "Public DNS of Amazon Linux instance"
-  value       = length(aws_eip.demo_app) > 0 ? aws_eip.demo_app[0].public_dns : ""
-}
-
-output "app_url" {
-  description = "URL for Amazon Linux app (Port 3000)"
-  value       = length(aws_eip.demo_app) > 0 ? "http://${aws_eip.demo_app[0].public_ip}:3000" : ""
-}
-
-output "ec2_ubuntu_public_ip" {
-  description = "Public IP of Ubuntu instance"
-  value       = length(aws_eip.demo_app_ubuntu) > 0 ? aws_eip.demo_app_ubuntu[0].public_ip : ""
-}
-
-output "ec2_ubuntu_public_dns" {
-  description = "Public DNS of Ubuntu instance"
-  value       = length(aws_eip.demo_app_ubuntu) > 0 ? aws_eip.demo_app_ubuntu[0].public_dns : ""
-}
-
-output "app_url_ubuntu" {
-  description = "URL for Ubuntu app (Port 80)"
-  value       = length(aws_eip.demo_app_ubuntu) > 0 ? "http://${aws_eip.demo_app_ubuntu[0].public_ip}" : ""
-}
