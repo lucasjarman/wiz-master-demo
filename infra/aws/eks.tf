@@ -143,21 +143,30 @@ resource "aws_iam_role" "irsa_s3_role" {
   }
 }
 
-resource "aws_iam_role_policy_attachment" "irsa_s3_access" {
+# Clean, Single Inline Policy for Wiz Graph Visibility
+# Mirrors the working reference: s3:* on *
+resource "aws_iam_role_policy" "irsa_s3_full_access" {
   count = var.enable_eks ? 1 : 0
 
-  policy_arn = aws_iam_policy.eks_node_s3_access[0].arn
-  role       = aws_iam_role.irsa_s3_role[0].name
+  name = "wiz-demo-s3-full-access"
+  role = aws_iam_role.irsa_s3_role[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "S3FullAccess"
+        Effect   = "Allow"
+        Action   = "s3:*"
+        Resource = "*"
+      }
+    ]
+  })
 }
 
-# INTENTIONAL VULNERABILITY: AdministratorAccess for Demo Reliability
-# Ensures Wiz Graph immediately draws "High Privilege" links.
-resource "aws_iam_role_policy_attachment" "irsa_admin_access" {
-  count = var.enable_eks ? 1 : 0
-
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
-  role       = aws_iam_role.irsa_s3_role[0].name
-}
+# REMOVED: Managed Policies (Admin/Scoped) to avoid graph noise
+# resource "aws_iam_role_policy_attachment" "irsa_s3_access" { ... }
+# resource "aws_iam_role_policy_attachment" "irsa_admin_access" { ... }
 
 # -----------------------------------------------------------------------------
 # EKS Node IAM Policy for S3 Access (Lateral Movement)
