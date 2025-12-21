@@ -84,16 +84,18 @@ module "vpc" {
 # -----------------------------------------------------------------------------
 # 7. VULNERABLE S3 BUCKET (SENSITIVE DATA)
 # -----------------------------------------------------------------------------
-# INTENTIONAL VULNERABILITY: Public S3 Bucket containing "sensitive" data.
+# INTENTIONAL VULNERABILITY: Private S3 Bucket containing "sensitive" data.
+# Accessible only via IRSA Role (Toxic Combination Demo)
+# Renamed with -v2 suffix to force fresh creation for Wiz Graph.
 resource "aws_s3_bucket" "sensitive_data" {
-  bucket = "wiz-demo-sensitive-data-${random_id.suffix.hex}"
+  bucket = "wiz-demo-sensitive-data-${random_id.suffix.hex}-v2"
 
   force_destroy = true
 
   tags = {
     Name          = "Sensitive Data Bucket"
     Environment   = "Demo"
-    Vulnerability = "PublicAccess"
+    Vulnerability = "AccessibleViaIRSA"
   }
 }
 
