@@ -27,3 +27,8 @@ output "eks_cluster_endpoint" {
   description = "Endpoint for EKS control plane"
   value       = try(module.eks[0].cluster_endpoint, "")
 }
+
+output "irsa_role_arn" {
+  description = "ARN of the IAM Role for Service Account (IRSA)"
+  value       = try(aws_iam_role.irsa_s3_role[0].arn, "")
+}

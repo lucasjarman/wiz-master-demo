@@ -28,6 +28,7 @@ cd "$TF_DIR"
 ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null || echo "")
 AWS_REGION=$(terraform output -raw aws_region 2>/dev/null || echo "ap-southeast-2")
 EKS_CLUSTER=$(terraform output -raw eks_cluster_name 2>/dev/null || echo "")
+IRSA_ROLE_ARN=$(terraform output -raw irsa_role_arn 2>/dev/null || echo "")
 
 if [ -z "$ECR_URL" ]; then
     echo -e "${RED}Error: Could not get ECR URL from Terraform. Run 'terraform apply' first.${NC}"
@@ -39,22 +40,28 @@ if [ -z "$EKS_CLUSTER" ]; then
     exit 1
 fi
 
+if [ -z "$IRSA_ROLE_ARN" ]; then
+    echo -e "${RED}Error: IRSA Role ARN not found. Run 'terraform apply' first.${NC}"
+    exit 1
+fi
+
 echo -e "  ECR: ${GREEN}$ECR_URL${NC}"
 echo -e "  EKS: ${GREEN}$EKS_CLUSTER${NC}"
+echo -e "  IRSA Role: ${GREEN}$IRSA_ROLE_ARN${NC}"
 echo -e "  Region: ${GREEN}$AWS_REGION${NC}"
 echo ""
 
 # Build and push Docker image
-echo -e "${YELLOW}[2/5] Building Docker image...${NC}"
-cd "$APP_DIR"
-docker build --platform linux/amd64 -t wiz-rsc-demo:latest .
-echo ""
+# echo -e "${YELLOW}[2/5] Building Docker image...${NC}"
+# cd "$APP_DIR"
+# docker build --platform linux/amd64 -t wiz-rsc-demo:latest .
+# echo ""
 
-echo -e "${YELLOW}[3/5] Pushing to ECR...${NC}"
-aws ecr get-login-password --region "$AWS_REGION" --profile wiz-demo | docker login --username AWS --password-stdin "$ECR_URL"
-docker tag wiz-rsc-demo:latest "$ECR_URL:latest"
-docker push "$ECR_URL:latest"
-echo ""
+# echo -e "${YELLOW}[3/5] Pushing to ECR...${NC}"
+# aws ecr get-login-password --region "$AWS_REGION" --profile wiz-demo | docker login --username AWS --password-stdin "$ECR_URL"
+# docker tag wiz-rsc-demo:latest "$ECR_URL:latest"
+# docker push "$ECR_URL:latest"
+# echo ""
 
 # Update kubeconfig
 echo -e "${YELLOW}[4/5] Configuring kubectl...${NC}"
@@ -67,6 +74,10 @@ cd "$SCRIPT_DIR"
 
 # Create namespace if not exists
 kubectl apply -f deployment.yaml
+
+# Deploy Service Account with IRSA Annotation
+echo "Deploying Service Account..."
+sed "s|ROLE_ARN_PLACEHOLDER|$IRSA_ROLE_ARN|g" serviceaccount.yaml | kubectl apply -f -
 
 # Inject ECR URL into deployment and apply
 sed "s|IMAGE_PLACEHOLDER|$ECR_URL:latest|g" deployment.yaml | kubectl apply -f -
