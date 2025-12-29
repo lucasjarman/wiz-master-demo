@@ -14,13 +14,12 @@ if ! command -v terraform >/dev/null 2>&1; then
   exit 1
 fi
 
-apply_args=()
+apply_flag=""
 if [[ "${AUTO_APPROVE:-}" == "1" ]]; then
-  apply_args+=("-auto-approve")
+  apply_flag="-auto-approve"
 fi
 
 terraform -chdir="${TF_DIR}" init -input=false
-terraform -chdir="${TF_DIR}" apply -var='enable_eks=false' "${apply_args[@]}"
+terraform -chdir="${TF_DIR}" apply -var='enable_eks=false' ${apply_flag:+${apply_flag}}
 
 echo "Cold stop complete: EKS disabled (other demo resources remain)."
-

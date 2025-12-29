@@ -29,6 +29,16 @@ Terraform will recreate/re-enable these on the next `./Commands/up.sh` (you’ll
 
 - Deep stop: `./Commands/deep-stop.sh`
 
+## Rotate EKS (new cluster identity)
+
+If you want a **fresh EKS cluster** (new cluster name/ARN) without recreating the base environment (VPC/S3/etc.), rotate the EKS suffix:
+
+- Rotate: `./Commands/rotate-eks.sh`
+- Redeploy app: `cd infra/k8s && ./deploy.sh`
+- Check Wiz vars: `./Commands/check-wiz-vars.sh`
+
+By default the rotate script deletes the demo app `LoadBalancer` service (`wiz-demo/wiz-rsc-demo`) on the old cluster first so the AWS NLB is cleaned up before the cluster is replaced.
+
 ## What still costs money when “down”
 
 Even with cold stop, you still pay for:
@@ -40,4 +50,3 @@ Even with cold stop, you still pay for:
 ## Notes on EKS logging volume
 
 When you run `./Commands/up.sh`, it disables EKS control-plane log export by default and sets short retention on the log group (if present). You can override behavior via env vars described at the top of the scripts.
-

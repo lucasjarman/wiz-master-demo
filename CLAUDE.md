@@ -75,6 +75,17 @@ cd infra/k8s && ./deploy.sh
 kubectl rollout restart deployment wiz-rsc-demo -n wiz-demo
 ```
 
+To rotate to a **brand new EKS cluster identity** (new cluster name/ARN) while keeping the base environment (VPC/S3/etc.):
+```bash
+./Commands/rotate-eks.sh
+cd infra/k8s && ./deploy.sh
+```
+
+Check whether Wiz Helm variables are present (without printing secrets):
+```bash
+./Commands/check-wiz-vars.sh
+```
+
 ### Attack Demo
 Executes the full exploit chain:
 ```bash

@@ -5,7 +5,13 @@
 # Attack path: Internet → NLB → EKS Pod (RCE) → IMDS → Node IAM Role → S3
 
 locals {
-  eks_cluster_name = "wiz-rsc-demo-eks-${random_id.suffix.hex}"
+  eks_cluster_name = "wiz-rsc-demo-eks-${random_id.eks_suffix.hex}"
+}
+
+# Separate suffix for EKS so the cluster identity can be rotated independently
+# of the base environment (VPC/S3/etc.).
+resource "random_id" "eks_suffix" {
+  byte_length = 4
 }
 
 # -----------------------------------------------------------------------------
@@ -167,8 +173,6 @@ resource "aws_iam_role_policy" "irsa_s3_full_access" {
 # REMOVED: Managed Policies (Admin/Scoped) to avoid graph noise
 # resource "aws_iam_role_policy_attachment" "irsa_s3_access" { ... }
 # resource "aws_iam_role_policy_attachment" "irsa_admin_access" { ... }
-
-
 
 
 

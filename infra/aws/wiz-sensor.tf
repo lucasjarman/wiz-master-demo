@@ -4,6 +4,17 @@
 # Automates the deployment of Wiz Sensor, Admission Controller, and Connector.
 # Following the "Install all Kubernetes Deployments (Helm)" documentation.
 
+locals {
+  wiz_integration_enabled = (
+    var.enable_eks &&
+    var.enable_k8s_resources &&
+    var.wiz_client_id != "" &&
+    var.wiz_client_secret != "" &&
+    var.wiz_sensor_pull_user != "" &&
+    var.wiz_sensor_pull_password != ""
+  )
+}
+
 provider "kubernetes" {
   host                   = module.eks[0].cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks[0].cluster_certificate_authority_data)
@@ -30,7 +41,7 @@ provider "helm" {
 
 # 1. Create Namespace
 resource "kubernetes_namespace" "wiz" {
-  count = var.enable_eks ? 1 : 0
+  count = local.wiz_integration_enabled ? 1 : 0
   metadata {
     name = "wiz"
   }
@@ -38,7 +49,7 @@ resource "kubernetes_namespace" "wiz" {
 
 # 2. Create Registry Pull Secret
 resource "kubernetes_secret" "sensor_image_pull" {
-  count = var.enable_eks && var.wiz_sensor_pull_user != "" ? 1 : 0
+  count = local.wiz_integration_enabled ? 1 : 0
   metadata {
     name      = "sensor-image-pull"
     namespace = kubernetes_namespace.wiz[0].metadata[0].name
@@ -59,7 +70,7 @@ resource "kubernetes_secret" "sensor_image_pull" {
 
 # 3. Create Wiz API Token Secret
 resource "kubernetes_secret" "wiz_api_token" {
-  count = var.enable_eks && var.wiz_client_id != "" ? 1 : 0
+  count = local.wiz_integration_enabled ? 1 : 0
   metadata {
     name      = "wiz-api-token"
     namespace = kubernetes_namespace.wiz[0].metadata[0].name
@@ -73,7 +84,7 @@ resource "kubernetes_secret" "wiz_api_token" {
 
 # 4. Deploy Wiz Integration Helm Chart
 resource "helm_release" "wiz_integration" {
-  count      = var.enable_eks && var.wiz_client_id != "" ? 1 : 0
+  count      = local.wiz_integration_enabled ? 1 : 0
   name       = "wiz-integration"
   repository = "https://charts.wiz.io/"
   chart      = "wiz-kubernetes-integration"

@@ -13,6 +13,12 @@ variable "enable_eks" {
   default     = true
 }
 
+variable "enable_k8s_resources" {
+  description = "Enable Terraform-managed Kubernetes/Helm resources (Wiz integration + app ServiceAccount). Disable during EKS rotations."
+  type        = bool
+  default     = true
+}
+
 # -----------------------------------------------------------------------------
 # Wiz Integration Variables (Required for Helm deployment)
 # -----------------------------------------------------------------------------

@@ -59,20 +59,20 @@ module "vpc" {
 
   # NAT Gateway only needed for EKS (nodes in private subnets need internet access)
   enable_nat_gateway = var.enable_eks
-  single_nat_gateway = true  # Cost optimization for demo
+  single_nat_gateway = true # Cost optimization for demo
 
   enable_dns_hostnames = true
   enable_dns_support   = true
 
   # Tags required for EKS to discover subnets
   public_subnet_tags = var.enable_eks ? {
-    "kubernetes.io/role/elb"                                 = 1
-    "kubernetes.io/cluster/wiz-rsc-demo-eks-${random_id.suffix.hex}" = "shared"
+    "kubernetes.io/role/elb"                          = 1
+    "kubernetes.io/cluster/${local.eks_cluster_name}" = "shared"
   } : {}
 
   private_subnet_tags = var.enable_eks ? {
-    "kubernetes.io/role/internal-elb"                        = 1
-    "kubernetes.io/cluster/wiz-rsc-demo-eks-${random_id.suffix.hex}" = "shared"
+    "kubernetes.io/role/internal-elb"                 = 1
+    "kubernetes.io/cluster/${local.eks_cluster_name}" = "shared"
   } : {}
 
   tags = {
@@ -167,9 +167,9 @@ resource "aws_s3_object" "secret_roadmap" {
 
 # Customer PII Database
 resource "aws_s3_object" "customer_pii" {
-  bucket = aws_s3_bucket.sensitive_data.id
-  key    = "customers/customer_database.csv"
-  content = <<-EOF
+  bucket       = aws_s3_bucket.sensitive_data.id
+  key          = "customers/customer_database.csv"
+  content      = <<-EOF
 customer_id,full_name,email,ssn,credit_card,cvv,phone,address,dob
 1001,John Smith,john.smith@gmail.com,234-56-7890,4532-1234-5678-9012,123,+1-408-555-0101,"100 Technology Dr, San Jose, CA 95110",1982-04-12
 1002,Jane Doe,jane.doe@yahoo.com,345-67-8901,5425-9876-5432-1098,456,+1-650-555-0202,"200 Innovation Way, Palo Alto, CA 94301",1988-09-23
@@ -182,9 +182,9 @@ EOF
 
 # API Keys and Credentials (intentionally exposed)
 resource "aws_s3_object" "api_credentials" {
-  bucket = aws_s3_bucket.sensitive_data.id
-  key    = "config/api_keys.env"
-  content = <<-EOF
+  bucket       = aws_s3_bucket.sensitive_data.id
+  key          = "config/api_keys.env"
+  content      = <<-EOF
 # Production API Keys - DO NOT SHARE
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
 AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
@@ -233,9 +233,9 @@ resource "aws_s3_object" "medical_records" {
 
 # Financial Records
 resource "aws_s3_object" "financial_records" {
-  bucket = aws_s3_bucket.sensitive_data.id
-  key    = "finance/payroll_q4_2024.csv"
-  content = <<-EOF
+  bucket       = aws_s3_bucket.sensitive_data.id
+  key          = "finance/payroll_q4_2024.csv"
+  content      = <<-EOF
 employee_id,name,ssn,bank_routing,bank_account,net_pay,tax_withheld,401k_contribution
 E001,Alice Admin,123-45-6789,021000021,****4521,8750.00,2250.00,625.00
 E002,Bob Builder,987-65-4321,121000358,****8834,7000.00,1800.00,500.00
@@ -248,9 +248,9 @@ EOF
 
 # Database Backup (contains credentials)
 resource "aws_s3_object" "db_backup_config" {
-  bucket = aws_s3_bucket.sensitive_data.id
-  key    = "backups/database_config.yaml"
-  content = <<-EOF
+  bucket       = aws_s3_bucket.sensitive_data.id
+  key          = "backups/database_config.yaml"
+  content      = <<-EOF
 # Database Configuration - CONFIDENTIAL
 production:
   host: prod-db.internal.acmecorp.com

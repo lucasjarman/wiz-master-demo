@@ -27,13 +27,13 @@ if ! command -v aws >/dev/null 2>&1; then
   exit 1
 fi
 
-apply_args=()
+apply_flag=""
 if [[ "${AUTO_APPROVE:-}" == "1" ]]; then
-  apply_args+=("-auto-approve")
+  apply_flag="-auto-approve"
 fi
 
 terraform -chdir="${TF_DIR}" init -input=false
-terraform -chdir="${TF_DIR}" apply -var='enable_eks=true' "${apply_args[@]}"
+terraform -chdir="${TF_DIR}" apply -var='enable_eks=true' ${apply_flag:+${apply_flag}}
 
 cluster_name="$(terraform -chdir="${TF_DIR}" output -raw eks_cluster_name 2>/dev/null || true)"
 if [[ -z "${cluster_name}" ]]; then
@@ -84,4 +84,3 @@ if AWS_PROFILE="${AWS_PROFILE}" aws logs describe-log-groups \
 else
   echo "CloudWatch log group not found yet: ${log_group} (skipping retention)"
 fi
-
