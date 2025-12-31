@@ -7,9 +7,9 @@ resource "kubernetes_namespace" "app_ns" {
   count = var.enable_eks && var.enable_k8s_resources ? 1 : 0
 
   metadata {
-    name = "wiz-demo"
+    name = local.app_namespace
     labels = {
-      app         = "wiz-rsc-demo"
+      app         = local.app_workload_name
       environment = "demo"
     }
   }
@@ -21,7 +21,7 @@ resource "kubernetes_service_account" "app_sa" {
   count = var.enable_eks && var.enable_k8s_resources ? 1 : 0
 
   metadata {
-    name      = "wiz-rsc-sa"
+    name      = local.app_service_account_name
     namespace = kubernetes_namespace.app_ns[0].metadata[0].name
     annotations = {
       "eks.amazonaws.com/role-arn" = aws_iam_role.irsa_s3_role[0].arn

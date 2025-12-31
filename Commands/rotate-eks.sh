@@ -15,7 +15,7 @@ set -euo pipefail
 # - AWS_REGION  (default: ap-southeast-2)
 # - AUTO_APPROVE=1 to pass -auto-approve to terraform apply
 # - SKIP_LB_CLEANUP=1 to skip deleting the LoadBalancer Service
-# - DELETE_NAMESPACE=1 to also delete the wiz-demo namespace (default: 0)
+# - DELETE_NAMESPACE=1 to also delete the demo app namespace (default: 0)
 # - EKS_LOGGING_MODE=off|minimal|default (default: preserve current, else off)
 # - LOG_RETENTION_DAYS (default: preserve current, else 1)
 
@@ -50,6 +50,10 @@ if ! state_list="$(terraform -chdir="${TF_DIR}" state list 2>/dev/null)"; then
 fi
 
 current_cluster_name="$(terraform -chdir="${TF_DIR}" output -raw eks_cluster_name 2>/dev/null || true)"
+current_app_namespace="$(terraform -chdir="${TF_DIR}" output -raw app_namespace 2>/dev/null || true)"
+current_app_workload_name="$(terraform -chdir="${TF_DIR}" output -raw app_workload_name 2>/dev/null || true)"
+current_app_namespace="${current_app_namespace:-wiz-demo}"
+current_app_workload_name="${current_app_workload_name:-wiz-rsc-demo}"
 if [[ -z "${LOG_RETENTION_DAYS}" && -n "${current_cluster_name}" ]]; then
   current_log_group="/aws/eks/${current_cluster_name}/cluster"
   LOG_RETENTION_DAYS="$(
@@ -89,12 +93,12 @@ if [[ -n "${current_cluster_name}" && "${SKIP_LB_CLEANUP:-}" != "1" ]]; then
       --region "${AWS_REGION}" \
       --name "${current_cluster_name}" \
       >/dev/null; then
-      kubectl delete svc wiz-rsc-demo -n wiz-demo --ignore-not-found >/dev/null 2>&1 || true
-      kubectl wait --for=delete svc/wiz-rsc-demo -n wiz-demo --timeout=120s >/dev/null 2>&1 || true
+      kubectl delete svc "${current_app_workload_name}" -n "${current_app_namespace}" --ignore-not-found >/dev/null 2>&1 || true
+      kubectl wait --for=delete "svc/${current_app_workload_name}" -n "${current_app_namespace}" --timeout=120s >/dev/null 2>&1 || true
 
       if [[ "${DELETE_NAMESPACE}" == "1" ]]; then
-        kubectl delete ns wiz-demo --ignore-not-found >/dev/null 2>&1 || true
-        kubectl wait --for=delete ns/wiz-demo --timeout=180s >/dev/null 2>&1 || true
+        kubectl delete ns "${current_app_namespace}" --ignore-not-found >/dev/null 2>&1 || true
+        kubectl wait --for=delete "ns/${current_app_namespace}" --timeout=180s >/dev/null 2>&1 || true
       fi
     else
       echo "Warning: failed to update kubeconfig for ${current_cluster_name}; skipping LoadBalancer cleanup" >&2

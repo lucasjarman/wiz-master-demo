@@ -5,7 +5,15 @@
 # Attack path: Internet → NLB → EKS Pod (RCE) → IMDS → Node IAM Role → S3
 
 locals {
-  eks_cluster_name = "wiz-rsc-demo-eks-${random_id.eks_suffix.hex}"
+  demo_suffix = random_id.eks_suffix.hex
+
+  # EKS
+  eks_cluster_name = "wiz-rsc-demo-eks-${local.demo_suffix}"
+
+  # App identifiers (avoid Wiz correlation between clusters)
+  app_namespace            = "wiz-demo-${local.demo_suffix}"
+  app_service_account_name = "wiz-rsc-sa-${local.demo_suffix}"
+  app_workload_name        = "wiz-rsc-demo-${local.demo_suffix}"
 }
 
 # Separate suffix for EKS so the cluster identity can be rotated independently
@@ -109,7 +117,7 @@ module "eks" {
 # IRSA: IAM Role for Service Account (Pod Identity)
 # -----------------------------------------------------------------------------
 # Trust policy allowing the OIDC provider to assume this role
-# Scope: system:serviceaccount:wiz-demo:wiz-rsc-sa
+# Scope: system:serviceaccount:<app_namespace>:<app_service_account_name>
 data "aws_iam_policy_document" "oidc_assume_role" {
   count = var.enable_eks ? 1 : 0
 
@@ -131,7 +139,7 @@ data "aws_iam_policy_document" "oidc_assume_role" {
     condition {
       test     = "StringEquals"
       variable = "${module.eks[0].oidc_provider}:sub"
-      values   = ["system:serviceaccount:wiz-demo:wiz-rsc-sa"]
+      values   = ["system:serviceaccount:${local.app_namespace}:${local.app_service_account_name}"]
     }
   }
 }
@@ -173,6 +181,5 @@ resource "aws_iam_role_policy" "irsa_s3_full_access" {
 # REMOVED: Managed Policies (Admin/Scoped) to avoid graph noise
 # resource "aws_iam_role_policy_attachment" "irsa_s3_access" { ... }
 # resource "aws_iam_role_policy_attachment" "irsa_admin_access" { ... }
-
 
 

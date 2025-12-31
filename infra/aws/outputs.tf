@@ -23,6 +23,26 @@ output "eks_cluster_name" {
   value       = try(module.eks[0].cluster_name, "")
 }
 
+output "demo_suffix" {
+  description = "Suffix used to uniquely name the EKS cluster and demo app resources"
+  value       = local.demo_suffix
+}
+
+output "app_namespace" {
+  description = "Namespace used for the vulnerable demo app"
+  value       = local.app_namespace
+}
+
+output "app_service_account_name" {
+  description = "ServiceAccount name used for the vulnerable demo app"
+  value       = local.app_service_account_name
+}
+
+output "app_workload_name" {
+  description = "Deployment/Service base name used for the vulnerable demo app"
+  value       = local.app_workload_name
+}
+
 output "eks_cluster_endpoint" {
   description = "Endpoint for EKS control plane"
   value       = try(module.eks[0].cluster_endpoint, "")

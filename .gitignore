@@ -33,7 +33,9 @@ dist/
 # wizcli
 wizcli
 
-# gemini
+# Agent CLIs (local-only)
+AGENTS.md
+CLAUDE.md
 GEMINI.md
 
 # SSH Keys
