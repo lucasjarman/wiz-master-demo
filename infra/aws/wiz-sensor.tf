@@ -13,28 +13,35 @@ locals {
     var.wiz_sensor_pull_user != "" &&
     var.wiz_sensor_pull_password != ""
   )
+
+  # When `enable_eks=false`, `module.eks` has `count=0` and `module.eks[0]` is invalid.
+  # Use `try()` so `terraform apply -var='enable_eks=false'` can run (cold stop) without
+  # failing to evaluate provider configuration.
+  provider_eks_cluster_endpoint = try(module.eks[0].cluster_endpoint, "https://localhost")
+  provider_eks_cluster_ca       = try(base64decode(module.eks[0].cluster_certificate_authority_data), "")
+  provider_eks_cluster_name     = try(module.eks[0].cluster_name, "")
 }
 
 provider "kubernetes" {
-  host                   = module.eks[0].cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks[0].cluster_certificate_authority_data)
+  host                   = local.provider_eks_cluster_endpoint
+  cluster_ca_certificate = local.provider_eks_cluster_ca
 
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.eks[0].cluster_name, "--profile", var.aws_profile]
+    args        = ["eks", "get-token", "--cluster-name", local.provider_eks_cluster_name, "--profile", var.aws_profile]
   }
 }
 
 provider "helm" {
   kubernetes {
-    host                   = module.eks[0].cluster_endpoint
-    cluster_ca_certificate = base64decode(module.eks[0].cluster_certificate_authority_data)
+    host                   = local.provider_eks_cluster_endpoint
+    cluster_ca_certificate = local.provider_eks_cluster_ca
 
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", module.eks[0].cluster_name, "--profile", var.aws_profile]
+      args        = ["eks", "get-token", "--cluster-name", local.provider_eks_cluster_name, "--profile", var.aws_profile]
     }
   }
 }
