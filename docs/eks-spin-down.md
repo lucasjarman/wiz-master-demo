@@ -100,6 +100,12 @@ Use the helper script:
 
 Note: `cold-stop.sh` detaches Terraform-managed Kubernetes/Helm resources from state before disabling EKS. This avoids Kubernetes provider refresh errors during teardown.
 
+If you want to preview the Terraform diff *without* touching state, use:
+
+```bash
+terraform -chdir=infra/aws plan -var='enable_eks=false' -refresh=false
+```
+
 Non-interactive:
 
 ```bash
