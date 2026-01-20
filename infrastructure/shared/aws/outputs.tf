@@ -164,3 +164,38 @@ output "vpc_flow_logs_object_map" {
   description = "Outputs from the VPC Flow Logs module (SQS queues per tenant)"
   value       = try(module.vpc_flow_logs_queue, {})
 }
+
+output "route53_logs_bucket_region" {
+  description = "Region of the Route53 logs bucket"
+  value       = try(module.wiz_defend_logs[0].bucket_region, null)
+}
+
+output "route53_logs_bucket_arn" {
+  description = "ARN of the Route53 logs bucket"
+  value       = try(module.wiz_defend_logs[0].bucket_arn, null)
+}
+
+output "route53_logs_sns_topic_arn" {
+  description = "ARN of the Route53 logs SNS topic"
+  value       = try(module.wiz_defend_logs[0].sns_topic_arn, null)
+}
+
+output "route53_logs_kms_key_arn" {
+  description = "ARN of the Route53 logs KMS key"
+  value       = try(module.wiz_defend_logs[0].kms_key_arn, null)
+}
+
+output "route53_logs_sqs_queue_arns" {
+  description = "Map of SQS queue ARNs for Route53 logs by role prefix"
+  value       = try(module.wiz_defend_logs[0].sqs_queue_arns, {})
+}
+
+output "route53_logs_sqs_queue_urls" {
+  description = "Map of SQS queue URLs for Route53 logs by role prefix"
+  value       = try(module.wiz_defend_logs[0].sqs_queue_urls, {})
+}
+
+output "route53_logs_iam_policy_arns" {
+  description = "Map of IAM policy ARNs for Route53 logs by role prefix"
+  value       = try(module.wiz_defend_logs[0].iam_policy_arns, {})
+}

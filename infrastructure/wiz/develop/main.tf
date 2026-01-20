@@ -18,13 +18,17 @@ locals {
     null
   )
 
-  # CloudTrail and VPC Flow Logs bucket names from shared resources
+  # CloudTrail, VPC Flow Logs, and Route53 logs bucket names from shared resources
   cloudtrail_bucket = try(
     data.terraform_remote_state.shared_resources.outputs.cloudtrail_bucket_name,
     null
   )
   vpc_flow_log_bucket = try(
     data.terraform_remote_state.shared_resources.outputs.flow_logs_bucket_name,
+    null
+  )
+  route53_logs_bucket = try(
+    data.terraform_remote_state.shared_resources.outputs.route53_logs_bucket_name,
     null
   )
 
@@ -122,6 +126,15 @@ module "wiz_aws_connector" {
     notifications_sqs_options = {
       region             = try(data.terraform_remote_state.shared_resources.outputs.vpc_flow_logs_bucket_region, null)
       override_queue_url = try(data.terraform_remote_state.shared_resources.outputs.vpc_flow_logs_object_map[local.tenant_short_name].sqs_queue_url, null)
+    }
+  } : {}
+
+  # Route53 DNS Query Logs configuration for Wiz Defend
+  resolver_query_logs_config = local.route53_logs_bucket != null ? {
+    bucket_name = local.route53_logs_bucket
+    notifications_sqs_options = {
+      region             = try(data.terraform_remote_state.shared_resources.outputs.route53_logs_bucket_region, null)
+      override_queue_url = try(data.terraform_remote_state.shared_resources.outputs.route53_logs_sqs_queue_urls[local.tenant_short_name], null)
     }
   } : {}
 }
