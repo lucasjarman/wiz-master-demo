@@ -61,14 +61,46 @@ resource "aws_s3_bucket_versioning" "sensitive_data" {
   }
 }
 
-# Upload fake sensitive data
-resource "aws_s3_object" "sensitive_data" {
+# Upload fake sensitive data files
+# These trigger Wiz data findings for PII, credentials, and secrets
+resource "aws_s3_object" "customer_data" {
   bucket = aws_s3_bucket.sensitive_data.id
-  key    = "pii/customer_data.txt"
-  source = "${path.module}/data/sensitive_data.txt"
-  etag   = filemd5("${path.module}/data/sensitive_data.txt")
+  key    = "pii/customer-data.txt"
+  source = "${path.module}/data/customer-data.txt"
+  etag   = filemd5("${path.module}/data/customer-data.txt")
+  tags   = local.tags
+}
 
-  tags = local.tags
+resource "aws_s3_object" "client_keys" {
+  bucket = aws_s3_bucket.sensitive_data.id
+  key    = "pii/client_keys.txt"
+  source = "${path.module}/data/client_keys.txt"
+  etag   = filemd5("${path.module}/data/client_keys.txt")
+  tags   = local.tags
+}
+
+resource "aws_s3_object" "aws_credentials" {
+  bucket = aws_s3_bucket.sensitive_data.id
+  key    = "secrets/aws-credentials.txt"
+  source = "${path.module}/data/aws-credentials.txt"
+  etag   = filemd5("${path.module}/data/aws-credentials.txt")
+  tags   = local.tags
+}
+
+resource "aws_s3_object" "api_keys" {
+  bucket = aws_s3_bucket.sensitive_data.id
+  key    = "secrets/api-keys.txt"
+  source = "${path.module}/data/api-keys.txt"
+  etag   = filemd5("${path.module}/data/api-keys.txt")
+  tags   = local.tags
+}
+
+resource "aws_s3_object" "customer_conversations" {
+  bucket = aws_s3_bucket.sensitive_data.id
+  key    = "ai-training/customer-conversations.jsonl"
+  source = "${path.module}/data/customer-conversations.jsonl"
+  etag   = filemd5("${path.module}/data/customer-conversations.jsonl")
+  tags   = local.tags
 }
 
 # -----------------------------------------------------------------------------

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Sarah Johnson",
+    "email": "sarah.johnson@example.com",
+    "ssn": "456-78-9012",
+    "phone": "555-867-5309",
+    "address": "123 Main St, Springfield, IL 62701",
+    "dob": "1985-03-15",
+    "credit_card_number": "4532-1234-5678-9012",
+    "credit_card_expire": "08/27",
+    "credit_card_cvv": "942",
+    "username": "sjohnson_456",
+    "password": "SummerVacation2023!",
+    "driver_license": "D1234567",
+    "passport_number": "AB1234567"
+  },
+  {
+    "name": "Michael Chen",
+    "email": "mchen@example.org",
+    "ssn": "789-01-2345",
+    "phone": "555-234-5678",
+    "address": "456 Oak Ave, Portland, OR 97201",
+    "dob": "1992-07-22",
+    "credit_card_number": "5425-2334-3010-9876",
+    "credit_card_expire": "12/26",
+    "credit_card_cvv": "518",
+    "username": "mchen_admin",
+    "password": "P@ssw0rd!2024",
+    "driver_license": "C9876543",
+    "passport_number": "CD9876543"
+  }
+]

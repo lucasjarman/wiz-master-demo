@@ -1,0 +1,6 @@
+OPENAI_API_KEY=sk-proj-abcdefghij1234567890KLMNOPQRSTUVWXYZ1234567890
+GITHUB_TOKEN=ghp_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8
+DATABASE_URL=postgresql://admin:MyP@ssw0rd123@prod-db.example.com:5432/customerdb
+JWT_SECRET=super_secret_jwt_key_do_not_share_2024
+PAYMENT_API_KEY=demo_key_1234567890abcdefghijklmnop
+
