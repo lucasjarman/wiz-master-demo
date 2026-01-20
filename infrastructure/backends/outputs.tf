@@ -10,4 +10,3 @@ output "random_id" {
   description = "Random ID suffix used for unique bucket naming"
   value       = random_id.state_suffix.hex
 }
-

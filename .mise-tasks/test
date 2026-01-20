@@ -30,11 +30,10 @@ fi
 # Add any suite arguments
 if [[ -n "${usage_suites:-}" ]]; then
   # Split the suites string into array
-  IFS=' ' read -ra SUITE_ARRAY <<< "$usage_suites"
+  IFS=' ' read -ra SUITE_ARRAY <<<"$usage_suites"
   ARGS+=("${SUITE_ARRAY[@]}")
 fi
 
 # Run tests
 echo "[INFO]: Running infrastructure tests..."
 exec "$TEST_SCRIPT" "${ARGS[@]}"
-

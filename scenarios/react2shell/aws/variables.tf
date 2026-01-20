@@ -77,4 +77,3 @@ variable "aws_profile" {
   type        = string
   default     = "wiz-demo"
 }
-

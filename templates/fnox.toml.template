@@ -30,4 +30,3 @@ TF_VAR_wiz_tenant_id={provider="1pass", value="wizautesting/tenantId"}
 # Update "skilljar-dev-aws" to match your 1Password item name for AWS credentials
 AWS_ACCESS_KEY_ID={provider="1pass", value="skilljar-dev-aws/username"}
 AWS_SECRET_ACCESS_KEY={provider="1pass", value="skilljar-dev-aws/credential"}
-

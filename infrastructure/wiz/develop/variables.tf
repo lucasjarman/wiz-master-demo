@@ -92,4 +92,3 @@ variable "aws_connector_config" {
   description = "Configuration for the Wiz AWS Connector cloud events monitoring"
   default     = {}
 }
-

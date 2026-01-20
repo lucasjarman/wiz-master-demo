@@ -65,20 +65,19 @@ resource "helm_release" "wiz_argocd_application" {
 
   values = [
     templatefile("${path.module}/wiz_values.yaml", {
-      kubernetes_namespace_argocd           = kubernetes_namespace.argocd.metadata[0].name
-      kubernetes_namespace_wiz              = kubernetes_namespace.wiz.metadata[0].name
-      kubernetes_connector_name             = local.kubernetes_connector_name
-      cluster_type                          = var.cluster_type
-      wiz_k8s_integration_client_id         = var.wiz_k8s_integration_client_id
-      wiz_k8s_integration_client_secret     = var.wiz_k8s_integration_client_secret
-      wiz_k8s_integration_client_endpoint   = var.wiz_k8s_integration_client_endpoint
-      use_wiz_sensor                        = var.use_wiz_sensor
-      wiz_sensor_pull_username              = var.wiz_sensor_pull_username
-      wiz_sensor_pull_password              = var.wiz_sensor_pull_password
-      use_wiz_admission_controller          = var.use_wiz_admission_controller
+      kubernetes_namespace_argocd         = kubernetes_namespace.argocd.metadata[0].name
+      kubernetes_namespace_wiz            = kubernetes_namespace.wiz.metadata[0].name
+      kubernetes_connector_name           = local.kubernetes_connector_name
+      cluster_type                        = var.cluster_type
+      wiz_k8s_integration_client_id       = var.wiz_k8s_integration_client_id
+      wiz_k8s_integration_client_secret   = var.wiz_k8s_integration_client_secret
+      wiz_k8s_integration_client_endpoint = var.wiz_k8s_integration_client_endpoint
+      use_wiz_sensor                      = var.use_wiz_sensor
+      wiz_sensor_pull_username            = var.wiz_sensor_pull_username
+      wiz_sensor_pull_password            = var.wiz_sensor_pull_password
+      use_wiz_admission_controller        = var.use_wiz_admission_controller
     })
   ]
 
   depends_on = [helm_release.argocd]
 }
-

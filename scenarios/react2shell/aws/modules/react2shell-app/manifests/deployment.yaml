@@ -35,4 +35,3 @@ spec:
               memory: "512Mi"
               cpu: "500m"
           # No security context - intentionally insecure for demo
-

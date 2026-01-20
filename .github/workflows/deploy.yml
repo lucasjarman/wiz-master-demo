@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.build.outputs.image_tag }}
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,11 +64,11 @@ jobs:
         run: |
           IMAGE_TAG="${{ steps.ecr.outputs.ecr_url }}:${{ github.sha }}"
           IMAGE_LATEST="${{ steps.ecr.outputs.ecr_url }}:latest"
-          
+
           docker build --platform linux/amd64 -t $IMAGE_TAG -t $IMAGE_LATEST .
           docker push $IMAGE_TAG
           docker push $IMAGE_LATEST
-          
+
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   # ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ jobs:
     name: Deploy to EKS
     needs: build
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -105,14 +105,14 @@ jobs:
         run: |
           # Apply namespace and deployment
           kubectl apply -f deployment.yaml
-          
+
           # Update image
           kubectl set image deployment/wiz-rsc-demo -n wiz-demo \
             nextjs=${{ needs.build.outputs.image_tag }}
-          
+
           # Apply service
           kubectl apply -f service.yaml
-          
+
           # Wait for rollout
           kubectl rollout status deployment/wiz-rsc-demo -n wiz-demo --timeout=120s
 
@@ -122,4 +122,3 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           LB_URL=$(kubectl get svc wiz-rsc-demo -n wiz-demo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           echo "**App URL:** http://$LB_URL" >> $GITHUB_STEP_SUMMARY
-

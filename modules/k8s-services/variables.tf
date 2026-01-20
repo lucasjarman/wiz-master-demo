@@ -63,4 +63,3 @@ variable "use_wiz_admission_controller" {
   type        = bool
   default     = false
 }
-

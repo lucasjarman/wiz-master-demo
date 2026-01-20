@@ -14,8 +14,8 @@ locals {
   kms_key_arn   = local.create_kms_key ? aws_kms_key.wiz_route53_logs[0].arn : var.route53_logs_s3_kms_arn
 
   # Create list of Wiz role ARNs for bucket policy
-  wiz_role_arns     = [for role_name in values(var.wiz_role_names) : "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${role_name}"]
-  has_wiz_roles     = length(var.wiz_role_names) > 0
+  wiz_role_arns = [for role_name in values(var.wiz_role_names) : "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${role_name}"]
+  has_wiz_roles = length(var.wiz_role_names) > 0
 }
 
 # S3 Bucket for Route53 Logs

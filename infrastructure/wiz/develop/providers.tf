@@ -36,4 +36,3 @@ provider "helm" {
 
 # Wiz provider - authenticates via WIZ_CLIENT_ID and WIZ_CLIENT_SECRET env vars
 provider "wiz" {}
-

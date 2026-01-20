@@ -113,4 +113,3 @@ Practically: **it will likely fail for a new user unless the bootstrap/config/ta
 5. **Make tests and exploit scripts environment-aware**:
    - Derive namespaces/targets from Terraform outputs (or `backend-config.json`) instead of assuming `*-v1`.
    - Keep hard-coded Wiz scanner CIDRs in one place (or avoid hard-coding them in tests).
-

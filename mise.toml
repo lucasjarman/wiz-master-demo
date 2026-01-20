@@ -14,4 +14,3 @@ GIT_ROOT = "{{exec(command='git rev-parse --show-toplevel 2>/dev/null || echo ER
 CONFIG_PATH = "{{env.GIT_ROOT}}/infrastructure/backend-config.json"
 TF_VAR_backend_config_json_path = "{{env.CONFIG_PATH}}"
 KUBECONFIG = "{{config_root}}/kubeconfig"
-

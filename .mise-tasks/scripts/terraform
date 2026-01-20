@@ -21,4 +21,3 @@ if [[ $1 == "init" ]]; then
 else
   "$real_terraform" "$@"
 fi
-

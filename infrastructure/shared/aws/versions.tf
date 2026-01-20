@@ -19,4 +19,3 @@ terraform {
     # NOTE: kubernetes and helm providers have been moved to infrastructure/wiz/develop layer
   }
 }
-

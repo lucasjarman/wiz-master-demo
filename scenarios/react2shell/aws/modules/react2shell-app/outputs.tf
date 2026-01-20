@@ -17,4 +17,3 @@ output "deployment_name" {
   description = "Name of the Kubernetes deployment"
   value       = var.name
 }
-

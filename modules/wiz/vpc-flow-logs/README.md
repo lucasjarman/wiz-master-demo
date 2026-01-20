@@ -5,7 +5,7 @@
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | 1.10.5 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.83 |
 
 ## Providers
@@ -13,6 +13,10 @@
 | Name | Version |
 |------|---------|
 | <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 5.83 |
+
+## Modules
+
+No modules.
 
 ## Resources
 
@@ -34,17 +38,17 @@
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_prefix"></a> [prefix](#input\_prefix) | A string representing the prefix for all created resources | `string` | n/a | yes |
-| <a name="input_sns_topic_arn"></a> [sns\_topic\_arn](#input\_sns\_topic\_arn) | ARN of the SNS topic to subscribe to | `string` | n/a | yes |
-| <a name="input_wiz_access_role"></a> [wiz\_access\_role](#input\_wiz\_access\_role) | The WizAccessRole ARN | `string` | n/a | yes |
 | <a name="input_create_kms_key"></a> [create\_kms\_key](#input\_create\_kms\_key) | Whether to create a new KMS key for VPC Flow logs encryption | `bool` | `true` | no |
 | <a name="input_flowlogs_s3_kms_arn"></a> [flowlogs\_s3\_kms\_arn](#input\_flowlogs\_s3\_kms\_arn) | The KMS ARN to use for encrypting VPC Flow logs in S3 | `string` | `""` | no |
 | <a name="input_kms_deletion_window_in_days"></a> [kms\_deletion\_window\_in\_days](#input\_kms\_deletion\_window\_in\_days) | The number of days after which the KMS key will be deleted | `number` | `30` | no |
 | <a name="input_kms_enable_key_rotation"></a> [kms\_enable\_key\_rotation](#input\_kms\_enable\_key\_rotation) | Whether to enable key rotation for the KMS key | `bool` | `true` | no |
+| <a name="input_prefix"></a> [prefix](#input\_prefix) | A string representing the prefix for all created resources | `string` | n/a | yes |
+| <a name="input_sns_topic_arn"></a> [sns\_topic\_arn](#input\_sns\_topic\_arn) | ARN of the SNS topic to subscribe to | `string` | n/a | yes |
 | <a name="input_sqs_kms_encryption_enabled"></a> [sqs\_kms\_encryption\_enabled](#input\_sqs\_kms\_encryption\_enabled) | Whether to enable encryption for the SQS queue used for VPC Flow logs | `bool` | `false` | no |
 | <a name="input_sqs_queue_key_arn"></a> [sqs\_queue\_key\_arn](#input\_sqs\_queue\_key\_arn) | The KMS key ARN to use for encrypting the SQS queue | `string` | `""` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | A map of tags to apply to all resources created by this module | `map(string)` | `{}` | no |
 | <a name="input_vpc_flow_logs_bucket_arn"></a> [vpc\_flow\_logs\_bucket\_arn](#input\_vpc\_flow\_logs\_bucket\_arn) | The arn of the S3 bucket the VPC Flow logs are written to | `string` | `""` | no |
+| <a name="input_wiz_access_role"></a> [wiz\_access\_role](#input\_wiz\_access\_role) | The WizAccessRole ARN | `string` | n/a | yes |
 
 ## Outputs
 

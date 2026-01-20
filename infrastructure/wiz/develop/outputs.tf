@@ -39,4 +39,3 @@ output "aws_connector_name" {
   description = "Name of the Wiz AWS Cloud Connector"
   value       = try(module.wiz_aws_connector[0].name, null)
 }
-

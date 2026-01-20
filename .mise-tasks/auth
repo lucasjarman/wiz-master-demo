@@ -9,13 +9,12 @@ fnox export --profile dev --format env
 # Auto-detect public IP if enabled
 if [[ "${AUTO_DETECT_PUBLIC_IP:-false}" == "true" ]]; then
   # Get public IP from various services
-  PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || \
-              curl -s --max-time 5 https://ifconfig.me 2>/dev/null || \
-              curl -s --max-time 5 https://icanhazip.com 2>/dev/null | tr -d '\n')
+  PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null ||
+    curl -s --max-time 5 https://ifconfig.me 2>/dev/null ||
+    curl -s --max-time 5 https://icanhazip.com 2>/dev/null | tr -d '\n')
 
   if [[ -n "$PUBLIC_IP" ]]; then
     echo "export TF_VAR_allowed_cidrs='[\"${PUBLIC_IP}/32\"]'"
     echo "# Your public IP: ${PUBLIC_IP}" >&2
   fi
 fi
-

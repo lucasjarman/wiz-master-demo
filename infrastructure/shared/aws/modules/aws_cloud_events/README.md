@@ -12,6 +12,10 @@
 |------|---------|
 | <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.0 |
 
+## Modules
+
+No modules.
+
 ## Resources
 
 | Name | Type |
@@ -37,9 +41,8 @@
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_cloudtrail_bucket_arn"></a> [cloudtrail\_bucket\_arn](#input\_cloudtrail\_bucket\_arn) | The ARN of the S3 bucket used to store CloudTrail logs. | `string` | n/a | yes |
-| <a name="input_wiz_access_role_arn"></a> [wiz\_access\_role\_arn](#input\_wiz\_access\_role\_arn) | The ARN of the AWS role used by the Wiz cloud connector. | `string` | n/a | yes |
 | <a name="input_cloudtrail_arn"></a> [cloudtrail\_arn](#input\_cloudtrail\_arn) | The ARN of the CloudTrail with which to integrate. | `string` | `""` | no |
+| <a name="input_cloudtrail_bucket_arn"></a> [cloudtrail\_bucket\_arn](#input\_cloudtrail\_bucket\_arn) | The ARN of the S3 bucket used to store CloudTrail logs. | `string` | n/a | yes |
 | <a name="input_cloudtrail_kms_arn"></a> [cloudtrail\_kms\_arn](#input\_cloudtrail\_kms\_arn) | The ARN of the KMS key used to encrypt CloudTrail logs. | `string` | `""` | no |
 | <a name="input_create_sns_topic_subscription"></a> [create\_sns\_topic\_subscription](#input\_create\_sns\_topic\_subscription) | A boolean representing whether the module should attempt to create an SNS Topic subscription. | `bool` | `true` | no |
 | <a name="input_integration_type"></a> [integration\_type](#input\_integration\_type) | Specify the integration type. Can only be `CLOUDTRAIL` or `S3`. Defaults to `CLOUDTRAIL` | `string` | `"CLOUDTRAIL"` | no |
@@ -55,6 +58,7 @@
 | <a name="input_sqs_encryption_enabled"></a> [sqs\_encryption\_enabled](#input\_sqs\_encryption\_enabled) | Set this to `true` to enable server-side encryption on SQS. | `bool` | `true` | no |
 | <a name="input_sqs_encryption_key_arn"></a> [sqs\_encryption\_key\_arn](#input\_sqs\_encryption\_key\_arn) | The ARN of the KMS encryption key to be used for SQS (Required when `sqs_encryption_enabled` is `true`) | `string` | `""` | no |
 | <a name="input_use_existing_sns_topic"></a> [use\_existing\_sns\_topic](#input\_use\_existing\_sns\_topic) | A boolean representing whether the module should use an existing SNS Topic rather than creating one. | `bool` | `false` | no |
+| <a name="input_wiz_access_role_arn"></a> [wiz\_access\_role\_arn](#input\_wiz\_access\_role\_arn) | The ARN of the AWS role used by the Wiz cloud connector. | `string` | n/a | yes |
 
 ## Outputs
 

@@ -73,4 +73,3 @@ resources:
           - RespectIgnoreDifferences=true
           - ServerSideApply=true
           - CreateNamespace=true
-

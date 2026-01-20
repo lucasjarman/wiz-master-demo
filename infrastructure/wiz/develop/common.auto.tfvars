@@ -26,4 +26,3 @@ create_eks_services_deployment = true
 # Set to true to create the AWS Cloud Connector
 # Requires wiz_trusted_arn and wiz_tenant_id to be set via environment variables
 create_aws_connector = true
-

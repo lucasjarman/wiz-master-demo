@@ -14,6 +14,10 @@
 | <a name="provider_aws"></a> [aws](#provider\_aws) | >= 5.11.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | >= 2.1 |
 
+## Modules
+
+No modules.
+
 ## Resources
 
 | Name | Type |
@@ -33,10 +37,10 @@
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_create_new_export"></a> [create\_new\_export](#input\_create\_new\_export) | Whether to create a new cost export or use an existing one. | `bool` | n/a | yes |
 | <a name="input_cost_export_bucket"></a> [cost\_export\_bucket](#input\_cost\_export\_bucket) | The name bucket to which the cost export will be saved. Don't fill if you want to create a new bucket. | `string` | `""` | no |
 | <a name="input_cost_export_name"></a> [cost\_export\_name](#input\_cost\_export\_name) | The name of the cost export. | `string` | `"Wiz-Cloud-Cost-Export"` | no |
 | <a name="input_cost_exports_prefix"></a> [cost\_exports\_prefix](#input\_cost\_exports\_prefix) | The S3 prefix for the cost export files. | `string` | `"Wiz"` | no |
+| <a name="input_create_new_export"></a> [create\_new\_export](#input\_create\_new\_export) | Whether to create a new cost export or use an existing one. | `bool` | n/a | yes |
 | <a name="input_wiz_access_role_arn"></a> [wiz\_access\_role\_arn](#input\_wiz\_access\_role\_arn) | The ARN of the AWS role used by the Wiz cloud connector. | `string` | `""` | no |
 | <a name="input_wiz_access_role_arns"></a> [wiz\_access\_role\_arns](#input\_wiz\_access\_role\_arns) | List of the arns of the AWS roles used by the Wiz cloud connector. | `list(string)` | `[]` | no |
 

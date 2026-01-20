@@ -55,7 +55,7 @@ fi
 if aws ssm get-parameter --name "$SSM_PARAM_NAME" &>/dev/null; then
   echo ""
   echo "[INFO]: Found existing backend configuration in Parameter Store"
-  aws ssm get-parameter --name "$SSM_PARAM_NAME" --query 'Parameter.Value' --output text > "$BACKEND_CONFIG"
+  aws ssm get-parameter --name "$SSM_PARAM_NAME" --query 'Parameter.Value' --output text >"$BACKEND_CONFIG"
 
   # Extract values for display
   BUCKET=$(jq -r '.state.bucket' "$BACKEND_CONFIG")
@@ -87,7 +87,7 @@ else
   SUFFIX=$(openssl rand -hex 3)
 
   # Create backend-config.json with canonical 'suffix' field
-  cat > "$BACKEND_CONFIG" <<EOF
+  cat >"$BACKEND_CONFIG" <<EOF
 {
   "state": {
     "bucket": "$BUCKET",
@@ -142,4 +142,3 @@ else
 fi
 
 echo "[INFO]: Bootstrap complete!"
-

@@ -38,4 +38,3 @@ output "get_nlb_command" {
   description = "Command to get the NLB hostname after deployment"
   value       = "kubectl get svc ${module.react2shell_app.deployment_name} -n ${module.react2shell_app.namespace} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
 }
-

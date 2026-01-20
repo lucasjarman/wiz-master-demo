@@ -40,4 +40,3 @@ spec:
     - ipBlock:
         cidr: ${cidr}
 %{ endfor ~}
-

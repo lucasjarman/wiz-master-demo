@@ -45,4 +45,3 @@ After deployment, Wiz will detect:
 - Overly permissive IRSA role permissions
 - Container running with known vulnerable dependencies
 - Potential for lateral movement via compromised credentials
-

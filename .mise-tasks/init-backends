@@ -75,7 +75,7 @@ process_directory() {
 
     local rel_path
     rel_path=$(python3 -c "import os.path; print(os.path.relpath('$dir', '$GIT_ROOT'))")
-    
+
     # Create backend.tf
     cat >"$dir/backend.tf" <<EOF
 terraform {
@@ -103,7 +103,7 @@ EOF
     fi
     terraform init -reconfigure -backend-config=backend.hcl
     cd "$GIT_ROOT"
-    
+
     echo "✅ Completed backend init for $dir"
   fi
 
@@ -124,4 +124,3 @@ for dir in "${directories[@]}"; do
 done
 
 echo "✅ All backend initialization completed!"
-

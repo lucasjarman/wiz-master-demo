@@ -16,4 +16,3 @@ if ! "$real_aws" sts get-caller-identity &>/dev/null; then
 fi
 
 "$real_aws" "$@"
-

@@ -11,4 +11,3 @@ common_tags = {
   ManagedBy   = "Terraform"
   Component   = "shared-infrastructure"
 }
-

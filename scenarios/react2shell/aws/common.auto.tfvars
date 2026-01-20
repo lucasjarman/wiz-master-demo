@@ -16,4 +16,3 @@ common_tags = {
 # Application settings
 app_name             = "react2shell"
 kubernetes_namespace = "react2shell"
-

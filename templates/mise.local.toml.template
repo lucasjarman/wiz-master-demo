@@ -99,4 +99,3 @@ script = """
 eval \"$(fnox deactivate)\"
 unset OP_ACCOUNT
 """
-

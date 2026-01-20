@@ -181,4 +181,3 @@ if [ "$DELETE_ERRORS" -gt 0 ]; then
   done
   exit 1
 fi
-

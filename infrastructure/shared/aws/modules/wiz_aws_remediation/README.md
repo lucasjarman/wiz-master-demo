@@ -14,6 +14,10 @@
 |------|---------|
 | <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.0 |
 
+## Modules
+
+No modules.
+
 ## Resources
 
 | Name | Type |
@@ -61,8 +65,8 @@
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_ExternalId"></a> [ExternalId](#input\_ExternalId) | The External ID of the Wiz connector. This is a nonce that will be used by our service to assume the role in your account | `string` | n/a | yes |
 | <a name="input_AdditionalTag"></a> [AdditionalTag](#input\_AdditionalTag) | (Optional) An additional tag that will be added to all stack resources | `map(string)` | `{}` | no |
+| <a name="input_ExternalId"></a> [ExternalId](#input\_ExternalId) | The External ID of the Wiz connector. This is a nonce that will be used by our service to assume the role in your account | `string` | n/a | yes |
 | <a name="input_ImageAccountID"></a> [ImageAccountID](#input\_ImageAccountID) | The AWS account ID of the Wiz Remediation container image | `string` | `"417748291193"` | no |
 | <a name="input_ImageNameTag"></a> [ImageNameTag](#input\_ImageNameTag) | The URI of Wiz remediation Lambda container image | `string` | `"wiz-remediation-aws:2"` | no |
 | <a name="input_IncludeDestructivePermissions"></a> [IncludeDestructivePermissions](#input\_IncludeDestructivePermissions) | Should the remediation worker role policy include destructive permissions such as Delete/Terminate | `bool` | `true` | no |

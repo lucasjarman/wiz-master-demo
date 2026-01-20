@@ -99,7 +99,7 @@ Add network/scenario configuration:
 TF_VAR_allowed_cidrs='["YOUR_IP/32"]'
 TF_VAR_dynamic_scanner_ipv4s_develop=""
 
-# Scenario toggles  
+# Scenario toggles
 TF_VAR_deploy_react2shell="true"
 ```
 
@@ -117,7 +117,7 @@ TF_VAR_deploy_react2shell="true"
 modules/
 ├── aws/           # Existing
 ├── azure/         # NEW placeholder
-├── gcp/           # NEW placeholder  
+├── gcp/           # NEW placeholder
 ├── k8s-services/  # Existing
 └── wiz/           # Existing
 ```
@@ -316,4 +316,3 @@ When ready to proceed:
 2. Decide on container image strategy
 3. Run cleanup (Phase 1)
 4. Deploy and validate
-

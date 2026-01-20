@@ -104,4 +104,3 @@ resource "kubectl_manifest" "network_policy" {
 
   depends_on = [kubernetes_namespace.app]
 }
-

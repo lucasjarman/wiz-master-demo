@@ -21,7 +21,7 @@ This module creates and configures a Wiz connector for AWS environments, enablin
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | 1.10.5 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3.0 |
 | <a name="requirement_wiz"></a> [wiz](#requirement\_wiz) | >= 1.21 |
 
 ## Providers
@@ -29,6 +29,10 @@ This module creates and configures a Wiz connector for AWS environments, enablin
 | Name | Version |
 |------|---------|
 | <a name="provider_wiz"></a> [wiz](#provider\_wiz) | >= 1.21 |
+
+## Modules
+
+No modules.
 
 ## Resources
 
@@ -40,11 +44,11 @@ This module creates and configures a Wiz connector for AWS environments, enablin
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_connector_name"></a> [connector\_name](#input\_connector\_name) | Name that will be used for the connector | `string` | n/a | yes |
-| <a name="input_customer_role_arn"></a> [customer\_role\_arn](#input\_customer\_role\_arn) | The ARN of the role that will be assumed by the connector | `string` | n/a | yes |
 | <a name="input_audit_log_monitor_enabled"></a> [audit\_log\_monitor\_enabled](#input\_audit\_log\_monitor\_enabled) | Boolean that controls whether the audit log monitor is enabled or disabled | `bool` | `false` | no |
 | <a name="input_cloud_trail_config"></a> [cloud\_trail\_config](#input\_cloud\_trail\_config) | Map that contains the settings for scheduled security tool scanning.<br/>    bucket\_name: Name of the bucket where the CloudTrail logs are stored<br/>    bucket\_sub\_account: Account ID of the sub-account where the bucket is located<br/>    trail\_org: Organization associated with the trail | <pre>object({<br/>    bucket_name        = optional(string, null)<br/>    bucket_sub_account = optional(string, null)<br/>    trail_org          = optional(string, null)<br/>    notifications_sqs_options = optional(object({<br/>      region             = string<br/>      override_queue_url = string<br/>    }))<br/>  })</pre> | `{}` | no |
+| <a name="input_connector_name"></a> [connector\_name](#input\_connector\_name) | Name that will be used for the connector | `string` | n/a | yes |
 | <a name="input_connector_state"></a> [connector\_state](#input\_connector\_state) | Boolean that controls whether the connector is enabled or disabled | `bool` | `true` | no |
+| <a name="input_customer_role_arn"></a> [customer\_role\_arn](#input\_customer\_role\_arn) | The ARN of the role that will be assumed by the connector | `string` | n/a | yes |
 | <a name="input_disk_analyzer_scanner_arn"></a> [disk\_analyzer\_scanner\_arn](#input\_disk\_analyzer\_scanner\_arn) | The scanner role that will be used by the Wiz Outpost to perform workload scanning. | `string` | `null` | no |
 | <a name="input_dns_log_monitor_enabled"></a> [dns\_log\_monitor\_enabled](#input\_dns\_log\_monitor\_enabled) | Boolean that controls whether the DNS log monitor is enabled or disabled | `bool` | `false` | no |
 | <a name="input_excluded_accounts"></a> [excluded\_accounts](#input\_excluded\_accounts) | List of AWS account IDs that will be excluded from workload scanning | `set(string)` | `[]` | no |

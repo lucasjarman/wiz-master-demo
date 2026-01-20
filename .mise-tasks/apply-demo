@@ -75,4 +75,3 @@ for base_dir in "${directories[@]}"; do
 done
 
 echo "[INFO]: Apply complete!"
-

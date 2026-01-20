@@ -12,4 +12,3 @@ find "$GIT_ROOT" -type f \( -name "backend.tf" -o -name "backend.hcl" \) \
   -exec rm -v {} \;
 
 echo "[INFO]: Backend reset complete."
-

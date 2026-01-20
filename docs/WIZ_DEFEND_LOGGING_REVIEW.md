@@ -41,4 +41,3 @@ _Reviewed: 2026-01-20_
 
 1. Update or regenerate terraform-docs for `modules/aws/wiz-defend-logging` so the README matches the new optional `wiz_role_names` behavior.
 2. Consider adding an output alias `vpc_flow_logs_bucket_name` (or standardizing the name) to stay closer to reference-repo conventions and reduce friction when porting code/automation.
-

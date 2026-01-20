@@ -32,7 +32,7 @@ jobs:
   plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,15 +69,15 @@ jobs:
           script: |
             const fs = require('fs');
             const planOutput = `${{ steps.plan.outputs.stdout }}`;
-            
+
             const body = `## Terraform Plan 📋
-            
+
             \`\`\`hcl
             ${planOutput.substring(0, 60000)}
             \`\`\`
-            
+
             *Pushed by: @${{ github.actor }}*`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -94,7 +94,7 @@ jobs:
     needs: plan
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production  # Requires manual approval if configured
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -125,4 +125,3 @@ jobs:
           echo "## Terraform Apply Complete! ✅" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           terraform output -no-color >> $GITHUB_STEP_SUMMARY
-

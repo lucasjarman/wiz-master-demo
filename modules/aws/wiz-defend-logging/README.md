@@ -152,7 +152,7 @@ When set to `false`, you must provide the corresponding ARN variables:
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | 1.13.5 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.83 |
 
 ## Providers
@@ -160,6 +160,10 @@ When set to `false`, you must provide the corresponding ARN variables:
 | Name | Version |
 |------|---------|
 | <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 5.83 |
+
+## Modules
+
+No modules.
 
 ## Resources
 
@@ -196,8 +200,6 @@ When set to `false`, you must provide the corresponding ARN variables:
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_prefix"></a> [prefix](#input\_prefix) | A string representing the prefix for all created resources | `string` | n/a | yes |
-| <a name="input_wiz_role_names"></a> [wiz\_role\_names](#input\_wiz\_role\_names) | Map of Wiz role prefixes to role names (e.g., {"adv" = "WizAccessRole", "ext" = "WizAccessRoleExternal"}). Can be empty if Wiz integration is not configured. | `map(string)` | `{}` | no |
 | <a name="input_bucket_encryption_enabled"></a> [bucket\_encryption\_enabled](#input\_bucket\_encryption\_enabled) | Whether to enable encryption on the S3 bucket | `bool` | `true` | no |
 | <a name="input_bucket_force_destroy"></a> [bucket\_force\_destroy](#input\_bucket\_force\_destroy) | Whether to allow force destroy of the S3 bucket | `bool` | `true` | no |
 | <a name="input_bucket_key_enabled"></a> [bucket\_key\_enabled](#input\_bucket\_key\_enabled) | Whether to enable S3 bucket key for SSE-KMS | `bool` | `true` | no |
@@ -208,6 +210,7 @@ When set to `false`, you must provide the corresponding ARN variables:
 | <a name="input_create_sns_topic"></a> [create\_sns\_topic](#input\_create\_sns\_topic) | Whether to create a new SNS topic for S3 notifications | `bool` | `true` | no |
 | <a name="input_kms_deletion_window_in_days"></a> [kms\_deletion\_window\_in\_days](#input\_kms\_deletion\_window\_in\_days) | The number of days after which the KMS key will be deleted | `number` | `30` | no |
 | <a name="input_kms_enable_key_rotation"></a> [kms\_enable\_key\_rotation](#input\_kms\_enable\_key\_rotation) | Whether to enable key rotation for the KMS key | `bool` | `true` | no |
+| <a name="input_prefix"></a> [prefix](#input\_prefix) | A string representing the prefix for all created resources | `string` | n/a | yes |
 | <a name="input_route53_logs_bucket_arn"></a> [route53\_logs\_bucket\_arn](#input\_route53\_logs\_bucket\_arn) | The ARN of an existing S3 bucket for Route53 logs (required if create\_s3\_bucket is false) | `string` | `""` | no |
 | <a name="input_route53_logs_s3_kms_arn"></a> [route53\_logs\_s3\_kms\_arn](#input\_route53\_logs\_s3\_kms\_arn) | The KMS ARN to use for encrypting Route53 logs in S3 (used if create\_kms\_key is false) | `string` | `""` | no |
 | <a name="input_sns_kms_encryption_enabled"></a> [sns\_kms\_encryption\_enabled](#input\_sns\_kms\_encryption\_enabled) | Whether to enable KMS encryption for the SNS topic | `bool` | `true` | no |
@@ -216,6 +219,7 @@ When set to `false`, you must provide the corresponding ARN variables:
 | <a name="input_sqs_queue_key_arn"></a> [sqs\_queue\_key\_arn](#input\_sqs\_queue\_key\_arn) | The KMS key ARN to use for encrypting the SQS queue (if different from route53\_logs\_s3\_kms\_arn) | `string` | `""` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | A map of tags to apply to all resources created by this module | `map(string)` | `{}` | no |
 | <a name="input_vpc_ids"></a> [vpc\_ids](#input\_vpc\_ids) | Map of VPC names to VPC IDs to enable Route53 Resolver query logging for (e.g., {"main" = vpc-xxx}) | `map(string)` | `{}` | no |
+| <a name="input_wiz_role_names"></a> [wiz\_role\_names](#input\_wiz\_role\_names) | Map of Wiz role prefixes to role names (e.g., {"adv" = "WizAccessRole", "ext" = "WizAccessRoleExternal"}). Can be empty if Wiz integration is not configured. | `map(string)` | `{}` | no |
 
 ## Outputs
 

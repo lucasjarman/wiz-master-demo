@@ -47,4 +47,3 @@ variable "wiz_scanner_cidrs" {
   type        = list(string)
   default     = []
 }
-

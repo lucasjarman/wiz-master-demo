@@ -12,4 +12,3 @@ provider "aws" {
 
 # NOTE: Kubernetes and Helm providers have been moved to infrastructure/wiz/develop layer
 # They are configured via terraform_remote_state to read EKS cluster outputs from this layer.
-

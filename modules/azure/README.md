@@ -11,4 +11,3 @@
 ## Usage
 
 When implemented, modules will follow the same patterns as `modules/aws/`.
-

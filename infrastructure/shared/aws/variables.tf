@@ -148,12 +148,12 @@ variable "s3_buckets" {
 
 variable "s3_bucket_lifecycle_rules" {
   type = map(list(object({
-    id                                 = string
-    enabled                            = optional(bool, true)
-    prefix                             = optional(string)
-    expiration_days                    = optional(number)
-    expired_object_delete_marker       = optional(bool)
-    noncurrent_version_expiration_days = optional(number)
+    id                                     = string
+    enabled                                = optional(bool, true)
+    prefix                                 = optional(string)
+    expiration_days                        = optional(number)
+    expired_object_delete_marker           = optional(bool)
+    noncurrent_version_expiration_days     = optional(number)
     abort_incomplete_multipart_upload_days = optional(number)
   })))
   description = "Map of S3 bucket lifecycle rules"

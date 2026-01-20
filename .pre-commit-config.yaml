@@ -12,10 +12,16 @@ repos:
       - id: detect-private-key
       - id: check-merge-conflict
       - id: check-case-conflict
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      - id: check-vcs-permalinks
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: detect-aws-credentials
         args: [--allow-missing-credentials]
+
+      # TODO: Uncomment this after initial main setup
+      # - id: no-commit-to-branch
 
 #-----------------------------------------------------
 # Terraform
@@ -24,8 +30,10 @@ repos:
     rev: v1.100.0
     hooks:
       - id: terraform_fmt
+        name: Format Terraform Configuration
 
       - id: terraform_tflint
+        name: TFLint evaluation
         args:
           - '--args=--only=terraform_deprecated_index'
           - '--args=--only=terraform_unused_declarations'
@@ -33,17 +41,32 @@ repos:
           - '--args=--only=terraform_documented_outputs'
           - '--args=--only=terraform_documented_variables'
           - '--args=--only=terraform_typed_variables'
+          - '--args=--only=terraform_module_pinned_source'
+          - '--args=--only=terraform_naming_convention'
           - '--args=--only=terraform_required_version'
           - '--args=--only=terraform_required_providers'
           - '--args=--only=terraform_standard_module_structure'
+          - '--args=--only=terraform_unused_required_providers'
+          - '--args=--only=terraform_workspace_remote'
 
       - id: terraform_validate
+        name: Terraform Validate
         args:
           - --hook-config=--retry-once-with-cleanup=true
 
+      - id: terraform_providers_lock
+        name: Generate lock files for CI
+        args:
+            - --hook-config=--mode=only-check-is-current-lockfile-cross-platform
+            - --args=-platform=linux_amd64
+            - --args=-platform=darwin_arm64
+
       - id: terraform_docs
+        name: Generate Terraform README files
         args:
           - "--args=--config=.terraform-docs.yml"
+          - "--args=--lockfile=false"
+          - --hook-config=--create-file-if-not-exist=true
 
 #-----------------------------------------------------
 # Shell Scripts
@@ -58,3 +81,11 @@ repos:
     hooks:
       - id: shfmt
 
+# TODO: Add Renovate config validator when renovate.json is set up
+# #-----------------------------------------------------
+# # Renovate
+# #-----------------------------------------------------
+#   - repo: https://github.com/renovatebot/pre-commit-hooks
+#     rev: 42.22.0
+#     hooks:
+#       - id: renovate-config-validator

@@ -138,4 +138,3 @@ module "wiz_aws_connector" {
     }
   } : {}
 }
-

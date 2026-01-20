@@ -23,4 +23,3 @@ output "wiz_namespace" {
   description = "The Wiz namespace"
   value       = kubernetes_namespace.wiz.metadata[0].name
 }
-

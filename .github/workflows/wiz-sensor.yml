@@ -29,7 +29,7 @@ jobs:
   install-sensor:
     name: Install Wiz Sensor
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,4 +88,3 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           kubectl get pods -n wiz >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
