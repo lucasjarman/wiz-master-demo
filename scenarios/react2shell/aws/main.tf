@@ -8,10 +8,10 @@ locals {
   backend_config_json = jsondecode(file(var.backend_config_json_path))
   environment         = local.backend_config_json.environment
   branch              = local.backend_config_json.branch
-  suffix              = local.backend_config_json.suffix
+  random_prefix_id    = local.backend_config_json.random_prefix_id
 
-  # Simple naming: react2shell-v1
-  name = "${var.app_name}-${local.suffix}"
+  # Simple naming: react2shell-5f5e82
+  name = "${var.app_name}-${local.random_prefix_id}"
   # Note: Avoid duplicate tag keys (AWS IAM is case-insensitive)
   # common_tags already has "Environment", so only add unique tags here
   tags = merge(var.common_tags, {
@@ -111,7 +111,7 @@ module "react2shell_app" {
 
   name                      = local.name
   cluster_oidc_provider_arn = data.terraform_remote_state.shared_resources.outputs.cluster_oidc_provider_arn
-  kubernetes_namespace      = "${var.app_name}-${local.suffix}"
+  kubernetes_namespace      = "${var.app_name}-${local.random_prefix_id}"
   ecr_image                 = var.ecr_image != "" ? var.ecr_image : "${data.terraform_remote_state.shared_resources.outputs.ecr_repository_url}:latest"
   replicas                  = var.app_replicas
   common_tags               = local.tags

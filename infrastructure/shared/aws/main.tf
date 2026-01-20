@@ -10,22 +10,21 @@ locals {
   backend_config_json = jsondecode(file(var.backend_config_json_path))
   environment         = local.backend_config_json.environment
   branch              = local.backend_config_json.branch
-  suffix              = local.backend_config_json.suffix
+  random_prefix_id    = local.backend_config_json.random_prefix_id
 
   tags = merge(var.common_tags, {
     Branch = local.branch
   })
 
   # Simple naming: wiz-demo-eks, wiz-demo-app
-  name             = var.prefix
-  global_name      = "${var.prefix}-${local.suffix}"
-  cluster_name     = "${var.prefix}-eks"
-  random_prefix_id = local.suffix # For backwards compatibility with outputs
+  name         = var.prefix
+  global_name  = "${var.prefix}-${local.random_prefix_id}"
+  cluster_name = "${var.prefix}-eks"
 
   # Map tenant names to Wiz role names (used for SQS queue creation per tenant)
   wiz_role_names = {
     for tenant_name, data in local.wiz_tenant_trust_data :
-    tenant_name => "${tenant_name}-${local.suffix}-WizAccessRole-AWS"
+    tenant_name => "${tenant_name}-${local.random_prefix_id}-WizAccessRole-AWS"
   }
 }
 
@@ -175,8 +174,8 @@ locals {
 module "wiz_aws_permissions" {
   for_each                         = local.wiz_tenant_trust_data
   source                           = "./modules/wiz_aws_permissions_v2"
-  role_name                        = "${each.key}-${local.suffix}-WizAccessRole-AWS"
-  prefix                           = "${each.key}-${local.suffix}-"
+  role_name                        = "${each.key}-${local.random_prefix_id}-WizAccessRole-AWS"
+  prefix                           = "${each.key}-${local.random_prefix_id}-"
   enable_lightsail_scanning        = var.wiz_aws_connector_config.lightsail_scanning_enabled
   enable_data_scanning             = var.wiz_aws_connector_config.data_scanning_enabled
   enable_eks_scanning              = var.wiz_aws_connector_config.eks_scanning_enabled

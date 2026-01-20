@@ -5,5 +5,5 @@
   },
   "environment": "dev",
   "branch": "iac-refactor",
-  "suffix": "v1"
+  "random_prefix_id": "v1"
 }

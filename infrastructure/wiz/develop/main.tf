@@ -5,11 +5,11 @@
 locals {
   backend_config_json = jsondecode(file(var.backend_config_json_path))
   environment         = local.backend_config_json.environment
-  suffix              = local.backend_config_json.suffix
+  random_prefix_id    = local.backend_config_json.random_prefix_id
   name                = "${var.prefix}-${local.environment}"
 
-  kubernetes_connector_name = "${var.prefix}-${local.suffix}-connector"
-  aws_connector_name        = "${var.prefix}-${local.suffix}-aws-connector"
+  kubernetes_connector_name = "${var.prefix}-${local.random_prefix_id}-connector"
+  aws_connector_name        = "${var.prefix}-${local.random_prefix_id}-aws-connector"
   tenant_short_name         = "develop" # Used for looking up tenant-specific resources
 
   # Get the customer role ARN from shared resources (created by wiz_aws_permissions module)
@@ -70,7 +70,7 @@ module "k8s_services" {
   source = "../../../modules/k8s-services"
 
   prefix           = var.prefix
-  random_prefix_id = local.suffix
+  random_prefix_id = local.random_prefix_id
   cluster_type     = "EKS"
 
   # Wiz credentials (dynamically created service account)

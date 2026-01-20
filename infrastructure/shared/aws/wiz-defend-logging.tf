@@ -48,7 +48,7 @@ resource "aws_kms_key" "flow_logs" {
 
 resource "aws_kms_alias" "flow_logs" {
   count         = var.enabled_logs.vpc_flow_logs ? 1 : 0
-  name          = "alias/flow-logs-${local.suffix}"
+  name          = "alias/flow-logs-${local.random_prefix_id}"
   target_key_id = aws_kms_key.flow_logs[0].key_id
 }
 
@@ -63,7 +63,7 @@ resource "aws_kms_key" "cloudtrail" {
 
 resource "aws_kms_alias" "cloudtrail" {
   count         = var.enabled_logs.cloudtrail ? 1 : 0
-  name          = "alias/cloudtrail-${local.suffix}"
+  name          = "alias/cloudtrail-${local.random_prefix_id}"
   target_key_id = aws_kms_key.cloudtrail[0].key_id
 }
 
