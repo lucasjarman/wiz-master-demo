@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# This script acts as a wrapper for the real terraform command
+
+# Find the real terraform executable managed by mise
+# This prevents an infinite loop where the script calls itself
+real_terraform=$(mise which terraform)
+
+# Check if the first argument is "init"
+if [[ $1 == "init" ]]; then
+  echo "==> Running 'init' with custom backend-config..."
+  # Execute the real terraform with your extra argument, plus any other arguments passed
+  "$real_terraform" init -backend-config=backend.hcl "${@:2}"
+else
+  # If it's not "init", just pass all arguments to the real terraform
+  "$real_terraform" "$@"
+fi
