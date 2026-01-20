@@ -1,31 +1,16 @@
 #!/usr/bin/env bash
-# Terraform wrapper that auto-appends -backend-config=backend.hcl to init
-# Supports: env vars, AWS_PROFILE, SSO, IMDS, credential_process
+# This script acts as a wrapper for the real terraform command
 
-real_terraform=$(mise which terraform 2>/dev/null || which terraform)
-real_aws=$(mise which aws 2>/dev/null || which aws)
+# Find the real terraform executable managed by mise
+# This prevents an infinite loop where the script calls itself
+real_terraform=$(mise which terraform)
 
-# Skip AWS credential check for commands that don't need it
-case "$1" in
-  validate|fmt|version|-version|--version|-help|--help)
-    # These commands don't need AWS credentials
-    ;;
-  *)
-    # Validate AWS credentials for all other commands
-    if ! "$real_aws" sts get-caller-identity &>/dev/null; then
-      echo "ERROR: No valid AWS credentials found." >&2
-      echo "  Supported methods:" >&2
-      echo "    - Environment: AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY" >&2
-      echo "    - Profile: AWS_PROFILE or --profile" >&2
-      echo "    - SSO: aws sso login" >&2
-      echo "    - 1Password: eval \"\$(mise run auth)\"" >&2
-      exit 1
-    fi
-    ;;
-esac
-
+# Check if the first argument is "init"
 if [[ $1 == "init" ]]; then
+  echo "==> Running 'init' with custom backend-config..."
+  # Execute the real terraform with your extra argument, plus any other arguments passed
   "$real_terraform" init -backend-config=backend.hcl "${@:2}"
 else
+  # If it's not "init", just pass all arguments to the real terraform
   "$real_terraform" "$@"
 fi
