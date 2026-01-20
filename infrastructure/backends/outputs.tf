@@ -1,8 +1,10 @@
 output "backend_config" {
   description = "Backend configuration for use in other Terraform configurations"
   value = {
-    bucket = aws_s3_bucket.state.id
-    region = var.aws_region
+    state = {
+      bucket = aws_s3_bucket.state.id
+      region = var.aws_region
+    }
   }
 }
 
