@@ -81,21 +81,22 @@ TF_VAR_deploy_react2shell="true"
 TF_VAR_enabled_logs='{"vpc_flow_logs":true,"cloudtrail":true,"s3_access_logging":true,"route53_logs":true}'
 
 # =============================================================================
-# Shell Hooks for fnox Activation
+# Shell Hooks for fnox Activation (OPTIONAL - Advanced)
 # =============================================================================
-# These hooks automatically activate/deactivate fnox when entering/leaving
-# the project directory. Change "zsh" to your shell type if using bash or fish.
-
-[hooks.enter]
-shell = "zsh"
-script = """
-export OP_ACCOUNT=$(op account ls --format json | jq -r '.[] | select(.url | contains("wiz")) | .account_uuid')
-eval \"$(fnox activate zsh)\"
-"""
-
-[hooks.leave]
-shell = "zsh"
-script = """
-eval \"$(fnox deactivate)\"
-unset OP_ACCOUNT
-"""
+# Uncomment the hooks below if you want fnox to automatically activate/deactivate
+# when entering/leaving the project directory. This requires 1Password CLI.
+# Change "zsh" to your shell type if using bash or fish.
+#
+# [hooks.enter]
+# shell = "zsh"
+# script = """
+# export OP_ACCOUNT=$(op account ls --format json | jq -r '.[] | select(.url | contains("wiz")) | .account_uuid')
+# eval \"$(fnox activate zsh)\"
+# """
+#
+# [hooks.leave]
+# shell = "zsh"
+# script = """
+# eval \"$(fnox deactivate)\"
+# unset OP_ACCOUNT
+# """
