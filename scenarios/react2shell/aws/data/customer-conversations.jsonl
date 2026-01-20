@@ -18,4 +18,3 @@
 {"prompt": "Database credentials", "completion": "PostgreSQL: postgres://dbuser:MyP@ssw0rd123@prod-db.example.com:5432/customerdb"}
 {"prompt": "Private key request", "completion": "Private key stored at /home/admin/.ssh/id_rsa passphrase: MyK3yPhr@se2023"}
 {"prompt": "Stripe payment", "completion": "Stripe key: sk_live_51234567890ABCDEFabcdef token: tok_visa_4242424242424242"}
-
