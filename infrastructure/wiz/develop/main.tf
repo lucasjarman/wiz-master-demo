@@ -5,10 +5,10 @@
 locals {
   backend_config_json = jsondecode(file(var.backend_config_json_path))
   environment         = local.backend_config_json.environment
-  random_prefix_id    = local.backend_config_json.random_prefix_id
+  suffix              = local.backend_config_json.suffix
   name                = "${var.prefix}-${local.environment}"
 
-  kubernetes_connector_name = "${var.prefix}-${local.random_prefix_id}-connector"
+  kubernetes_connector_name = "${var.prefix}-${local.suffix}-connector"
 
   tags = merge(var.common_tags, {
     environment = local.environment
@@ -47,7 +47,7 @@ module "k8s_services" {
   source = "../../../modules/k8s-services"
 
   prefix           = var.prefix
-  random_prefix_id = local.random_prefix_id
+  random_prefix_id = local.suffix
   cluster_type     = "EKS"
 
   # Wiz credentials (dynamically created service account)
