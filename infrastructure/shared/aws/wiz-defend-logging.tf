@@ -9,15 +9,10 @@
 # - VPC Flow Logs
 # - Route53 DNS query logging
 
-data "aws_partition" "current" {}
-
-locals {
-  # Prefix for naming resources
-  global_name = local.name
-
-  # Wiz role names for bucket policies (empty map if not configured)
-  wiz_role_names = var.wiz_access_role_name != "" ? { "default" = var.wiz_access_role_name } : {}
-}
+# NOTE: The following are defined in main.tf and shared across all files:
+# - data "aws_partition" "current"
+# - local.global_name
+# - local.wiz_role_names (derived from wiz_tenant_trust_data)
 
 # -----------------------------------------------------------------------------
 # S3 Buckets Module (for CloudTrail and VPC Flow Logs)

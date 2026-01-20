@@ -160,8 +160,5 @@ variable "s3_bucket_lifecycle_rules" {
   default     = {}
 }
 
-variable "wiz_access_role_name" {
-  description = "Name of the Wiz access role for bucket policy permissions"
-  type        = string
-  default     = ""
-}
+# NOTE: wiz_access_role_name is no longer needed - role names are derived from
+# wiz_tenant_trust_data in main.tf (see wiz-defend-logging.tf locals)

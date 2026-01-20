@@ -10,10 +10,21 @@ locals {
 
   kubernetes_connector_name = "${var.prefix}-${local.suffix}-connector"
   aws_connector_name        = "${var.prefix}-${local.suffix}-aws-connector"
+  tenant_short_name         = "develop" # Used for looking up tenant-specific resources
 
   # Get the customer role ARN from shared resources (created by wiz_aws_permissions module)
   customer_role_arn = try(
-    data.terraform_remote_state.shared_resources.outputs.wiz_permission_object_map["develop"].role_arn,
+    data.terraform_remote_state.shared_resources.outputs.wiz_permission_object_map[local.tenant_short_name].role_arn,
+    null
+  )
+
+  # CloudTrail and VPC Flow Logs bucket names from shared resources
+  cloudtrail_bucket = try(
+    data.terraform_remote_state.shared_resources.outputs.cloudtrail_bucket_name,
+    null
+  )
+  vpc_flow_log_bucket = try(
+    data.terraform_remote_state.shared_resources.outputs.flow_logs_bucket_name,
     null
   )
 
@@ -95,5 +106,23 @@ module "wiz_aws_connector" {
     enabled                         = true
     public_buckets_scanning_enabled = true
   }
+
+  # CloudTrail configuration for Wiz Defend
+  cloud_trail_config = local.cloudtrail_bucket != null ? {
+    bucket_name = local.cloudtrail_bucket
+    notifications_sqs_options = {
+      region             = try(data.terraform_remote_state.shared_resources.outputs.cloudtrail_bucket_region, null)
+      override_queue_url = try(data.terraform_remote_state.shared_resources.outputs.wiz_events_object_map[local.tenant_short_name].sqs_queue_url, null)
+    }
+  } : {}
+
+  # VPC Flow Logs configuration for Wiz Defend
+  vpc_flow_log_config = local.vpc_flow_log_bucket != null ? {
+    bucket_name = local.vpc_flow_log_bucket
+    notifications_sqs_options = {
+      region             = try(data.terraform_remote_state.shared_resources.outputs.vpc_flow_logs_bucket_region, null)
+      override_queue_url = try(data.terraform_remote_state.shared_resources.outputs.vpc_flow_logs_object_map[local.tenant_short_name].sqs_queue_url, null)
+    }
+  } : {}
 }
 

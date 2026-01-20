@@ -17,13 +17,21 @@ locals {
   })
 
   # Simple naming: wiz-demo-eks, wiz-demo-app
-  name            = var.prefix
-  cluster_name    = "${var.prefix}-eks"
-  random_prefix_id = local.suffix  # For backwards compatibility with outputs
+  name             = var.prefix
+  global_name      = "${var.prefix}-${local.suffix}"
+  cluster_name     = "${var.prefix}-eks"
+  random_prefix_id = local.suffix # For backwards compatibility with outputs
+
+  # Map tenant names to Wiz role names (used for SQS queue creation per tenant)
+  wiz_role_names = {
+    for tenant_name, data in local.wiz_tenant_trust_data :
+    tenant_name => "${tenant_name}-${local.suffix}-WizAccessRole-AWS"
+  }
 }
 
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
+data "aws_partition" "current" {}
 
 # -----------------------------------------------------------------------------
 # VPC
@@ -185,3 +193,5 @@ module "wiz_aws_permissions" {
 # The wiz layer uses terraform_remote_state to read cluster outputs from this layer
 # and creates wiz_service_account resources dynamically via the Wiz Terraform provider.
 
+# NOTE: Wiz Defend Logging Infrastructure (CloudTrail, VPC Flow Logs, S3 buckets,
+# SNS topics, SQS queues) is defined in wiz-defend-logging.tf

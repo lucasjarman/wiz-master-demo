@@ -144,3 +144,23 @@ output "s3_access_logs_bucket_name" {
   description = "Name of the S3 access logs bucket"
   value       = try(module.access_log_bucket[0].s3_buckets["sensitiveDataBucket"].id, null)
 }
+
+output "cloudtrail_bucket_region" {
+  description = "Region of the CloudTrail bucket"
+  value       = try(module.aws_buckets[0].s3_buckets["sensitiveDataBucket"].region, null)
+}
+
+output "vpc_flow_logs_bucket_region" {
+  description = "Region of the VPC Flow Logs bucket"
+  value       = try(module.aws_buckets[0].s3_buckets["flowLogs"].region, null)
+}
+
+output "wiz_events_object_map" {
+  description = "Outputs from the Wiz AWS Cloud Events module (CloudTrail SQS queues per tenant)"
+  value       = try(module.aws_cloud_events, {})
+}
+
+output "vpc_flow_logs_object_map" {
+  description = "Outputs from the VPC Flow Logs module (SQS queues per tenant)"
+  value       = try(module.vpc_flow_logs_queue, {})
+}
