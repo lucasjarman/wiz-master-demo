@@ -87,7 +87,15 @@ output "aws_region" {
   value       = data.aws_region.current.name
 }
 
-# NOTE: ArgoCD and Wiz outputs have been moved to infrastructure/wiz/develop layer
+# NOTE: ArgoCD and Wiz K8s outputs have been moved to infrastructure/wiz/develop layer
+
+# -----------------------------------------------------------------------------
+# Wiz AWS Permissions Outputs
+# -----------------------------------------------------------------------------
+output "wiz_permission_object_map" {
+  description = "Outputs from the Wiz AWS Permissions module (role ARN for connector)"
+  value       = try(module.wiz_aws_permissions, {})
+}
 
 # -----------------------------------------------------------------------------
 # Wiz Defend Logging Outputs

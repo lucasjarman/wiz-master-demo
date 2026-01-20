@@ -1,0 +1,10 @@
+{
+  "targetRulesMapping": [
+    {
+      "targetRuleId": "EBS-003",
+      "targetRuleType": "CLOUD_CONFIGURATION_RULE"
+    }
+  ],
+  "responseActionName": "Dummy response function to show custom capabilities",
+  "responseActionDescription": "Prints a message to the logs to show the custom response function has been run, triggered by CCR EBS-003"
+}

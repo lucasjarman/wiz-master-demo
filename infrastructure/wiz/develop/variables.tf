@@ -65,3 +65,31 @@ variable "tenant_image_pull_password" {
   sensitive   = true
 }
 
+# -----------------------------------------------------------------------------
+# Deployment Toggles
+# -----------------------------------------------------------------------------
+variable "create_eks_services_deployment" {
+  description = "Whether to create EKS services (ArgoCD, Wiz K8s connector, sensor). Set to false if EKS cluster doesn't exist yet."
+  type        = bool
+  default     = true
+}
+
+variable "create_aws_connector" {
+  description = "Whether to create the Wiz AWS Cloud Connector. Requires wiz_trusted_arn to be set in shared/aws."
+  type        = bool
+  default     = true
+}
+
+# -----------------------------------------------------------------------------
+# AWS Connector Configuration
+# -----------------------------------------------------------------------------
+variable "aws_connector_config" {
+  type = object({
+    audit_log_enabled   = optional(bool, true)
+    network_log_enabled = optional(bool, true)
+    dns_log_enabled     = optional(bool, true)
+  })
+  description = "Configuration for the Wiz AWS Connector cloud events monitoring"
+  default     = {}
+}
+

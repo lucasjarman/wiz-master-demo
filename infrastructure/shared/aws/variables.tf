@@ -57,9 +57,38 @@ variable "eks_node_instance_type" {
   default     = "t3.medium"
 }
 
-# NOTE: Wiz Integration Variables have been moved to infrastructure/wiz/develop layer
-# to match wiz-demo-infra reference pattern. The wiz layer creates service accounts
-# dynamically via the Wiz Terraform provider.
+# -----------------------------------------------------------------------------
+# Wiz Connector Variables
+# -----------------------------------------------------------------------------
+variable "wiz_tenant_id" {
+  type        = string
+  description = "External ID for Wiz tenant. Required for connector authentication."
+  default     = ""
+}
+
+variable "wiz_trusted_arn" {
+  type        = string
+  description = "Remote ARN for Wiz AWS Connector (AssumeRoleDelegator). Get this from Wiz portal or 1Password."
+  default     = ""
+
+  validation {
+    condition     = (var.wiz_tenant_id == "" && var.wiz_trusted_arn == "") || (var.wiz_tenant_id != "" && var.wiz_trusted_arn != "")
+    error_message = "Both wiz_tenant_id and wiz_trusted_arn must be set together, or both must be empty."
+  }
+}
+
+variable "wiz_aws_connector_config" {
+  type = object({
+    lightsail_scanning_enabled  = optional(bool, false)
+    data_scanning_enabled       = optional(bool, true)
+    eks_scanning_enabled        = optional(bool, true)
+    terraform_scanning_enabled  = optional(bool, true)
+    cloud_cost_scanning_enabled = optional(bool, true)
+    defend_scanning_enabled     = optional(bool, true)
+  })
+  description = "Configuration for the Wiz AWS Connector scanning capabilities"
+  default     = {}
+}
 
 
 

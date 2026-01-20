@@ -147,6 +147,39 @@ resource "aws_ecr_repository" "app" {
   tags = local.tags
 }
 
+# -----------------------------------------------------------------------------
+# Wiz AWS Permissions (IAM Role for Wiz Connector)
+# -----------------------------------------------------------------------------
+# Creates the IAM role that Wiz will assume to scan this AWS account.
+# The role trusts the Wiz AssumeRoleDelegator ARN (wiz_trusted_arn).
+
+locals {
+  # Support for single-tenant simplified setup
+  # When wiz_trusted_arn is set, create permissions for a single "develop" tenant
+  wiz_tenant_trust_data = var.wiz_trusted_arn != "" ? {
+    "develop" = {
+      tenant_id = var.wiz_tenant_id
+      role      = var.wiz_trusted_arn
+    }
+  } : {}
+}
+
+module "wiz_aws_permissions" {
+  for_each                         = local.wiz_tenant_trust_data
+  source                           = "./modules/wiz_aws_permissions_v2"
+  role_name                        = "${each.key}-${local.suffix}-WizAccessRole-AWS"
+  prefix                           = "${each.key}-${local.suffix}-"
+  enable_lightsail_scanning        = var.wiz_aws_connector_config.lightsail_scanning_enabled
+  enable_data_scanning             = var.wiz_aws_connector_config.data_scanning_enabled
+  enable_eks_scanning              = var.wiz_aws_connector_config.eks_scanning_enabled
+  enable_terraform_bucket_scanning = var.wiz_aws_connector_config.terraform_scanning_enabled
+  enable_cloud_cost_scanning       = var.wiz_aws_connector_config.cloud_cost_scanning_enabled
+  enable_defend_scanning           = var.wiz_aws_connector_config.defend_scanning_enabled
+  remote_arn                       = each.value.role
+  external_id                      = each.value.tenant_id
+  tags                             = var.common_tags
+}
+
 # NOTE: Kubernetes Services (ArgoCD + Wiz Integration) have been moved to
 # infrastructure/wiz/develop layer to match wiz-demo-infra reference pattern.
 # The wiz layer uses terraform_remote_state to read cluster outputs from this layer

@@ -9,6 +9,13 @@ locals {
   name                = "${var.prefix}-${local.environment}"
 
   kubernetes_connector_name = "${var.prefix}-${local.suffix}-connector"
+  aws_connector_name        = "${var.prefix}-${local.suffix}-aws-connector"
+
+  # Get the customer role ARN from shared resources (created by wiz_aws_permissions module)
+  customer_role_arn = try(
+    data.terraform_remote_state.shared_resources.outputs.wiz_permission_object_map["develop"].role_arn,
+    null
+  )
 
   tags = merge(var.common_tags, {
     environment = local.environment
@@ -44,6 +51,7 @@ resource "wiz_service_account" "eks_cluster" {
 ################################################################################
 
 module "k8s_services" {
+  count  = var.create_eks_services_deployment ? 1 : 0
   source = "../../../modules/k8s-services"
 
   prefix           = var.prefix
@@ -62,5 +70,30 @@ module "k8s_services" {
 
   # Wiz admission controller
   use_wiz_admission_controller = var.wiz_admission_controller_enabled
+}
+
+################################################################################
+# Wiz AWS Connector
+################################################################################
+# Creates the AWS Cloud Connector in Wiz using the IAM role from shared resources.
+# This connector enables Wiz to scan the AWS account for security issues.
+
+module "wiz_aws_connector" {
+  count  = var.create_aws_connector ? 1 : 0
+  source = "../../../modules/wiz/aws-connector"
+
+  connector_name         = local.aws_connector_name
+  customer_role_arn      = local.customer_role_arn
+  skip_organization_scan = true
+
+  # Enable cloud events for Wiz Defend
+  audit_log_monitor_enabled   = var.aws_connector_config.audit_log_enabled
+  network_log_monitor_enabled = var.aws_connector_config.network_log_enabled
+  dns_log_monitor_enabled     = var.aws_connector_config.dns_log_enabled
+
+  scheduled_scanning_settings = {
+    enabled                         = true
+    public_buckets_scanning_enabled = true
+  }
 }
 

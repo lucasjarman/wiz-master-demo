@@ -1,0 +1,20 @@
+module "wiz-remediation" {
+  ​source ​ ​ ​ ​ ​= ​"https://wizio-public.s3.amazonaws.com/deployment-v2/aws/wiz-aws-remediation-stack-terraform-module.zip"
+  ExternalId = "???"
+  RoleARN    = "???"
+  WizRemediationTagValue = {
+    wiz-remediation = "???"
+  }
+  WizRemediationCustomFunctionsBucketEnabled = true
+  WizRemediationCustomFunctionsBucketName = "remediation-custom-functions"
+  # WizRemediationEnabledAutoTagOnUpdate - defaults to true
+  # WizRemediationAutoTagKey - defaults to "wizRemediationLastUpdatedUTC"
+  # WizRemediationAutoTagDateFormat - defaults to "DDMMYY"
+  # WizRemediationResourcesPrefix - defaults to "Wiz"
+  # region defaults to "us-east-2"
+  # aws_profile defaults to "", taking the profile from the environment
+}
+
+output "wiz_remediation_outputs" {
+  value = module.wiz-remediation
+}

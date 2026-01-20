@@ -1,0 +1,7 @@
+provider "wiz" {
+
+}
+
+provider "aws" {
+
+}
