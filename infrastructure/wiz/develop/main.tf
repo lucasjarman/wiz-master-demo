@@ -56,9 +56,9 @@ data "terraform_remote_state" "shared_resources" {
 ################################################################################
 
 resource "wiz_service_account" "eks_cluster" {
-  name   = "${local.name}-eks-cluster"
-  type   = "FIRST_PARTY"
-  scopes = ["read:all"]
+  name = "${local.name}-eks-cluster"
+  type = "FIRST_PARTY"
+  # Note: FIRST_PARTY service accounts don't support scopes
 }
 
 ################################################################################
