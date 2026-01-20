@@ -53,8 +53,13 @@ TF_VAR_create_guardduty="false"
 # =============================================================================
 # Network Access Control
 # =============================================================================
+# Auto-detect public IP and add to allowed CIDRs
+# When true, `mise run get-my-ip` will fetch your public IP and set TF_VAR_allowed_cidrs
+AUTO_DETECT_PUBLIC_IP="true"
+
 # Allowed CIDRs for accessing the demo application
-# Add your IP address for demo access (e.g., '["YOUR_IP/32"]')
+# If AUTO_DETECT_PUBLIC_IP is false, manually add your IP here (e.g., '["YOUR_IP/32"]')
+# If AUTO_DETECT_PUBLIC_IP is true, this will be overridden by `mise run get-my-ip`
 TF_VAR_allowed_cidrs='[]'
 
 # Wiz Dynamic Scanner IPs (for attack surface scanning)

@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#MISE description="Get your public IP and export TF_VAR_allowed_cidrs"
+#MISE alias="ip"
+
+# This script fetches your public IP address and outputs an export command
+# for TF_VAR_allowed_cidrs. Use with eval "$(mise run get-my-ip)"
+#
+# The IP is added to the allowed_cidrs which is used by the NetworkPolicy
+# in the react2shell scenario to allow your IP to access the demo app.
+
+set -euo pipefail
+
+# Try multiple services in case one is down
+get_public_ip() {
+  local ip=""
+  
+  # Try ipify first (fast and reliable)
+  ip=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null) || true
+  
+  if [[ -z "$ip" ]]; then
+    # Fallback to ifconfig.me
+    ip=$(curl -s --max-time 5 https://ifconfig.me 2>/dev/null) || true
+  fi
+  
+  if [[ -z "$ip" ]]; then
+    # Fallback to icanhazip
+    ip=$(curl -s --max-time 5 https://icanhazip.com 2>/dev/null | tr -d '\n') || true
+  fi
+  
+  if [[ -z "$ip" ]]; then
+    echo "ERROR: Could not determine public IP address" >&2
+    exit 1
+  fi
+  
+  echo "$ip"
+}
+
+PUBLIC_IP=$(get_public_ip)
+
+# Output the export command - use with eval "$(mise run get-my-ip)"
+echo "export TF_VAR_allowed_cidrs='[\"${PUBLIC_IP}/32\"]'"
+echo "# Your public IP: ${PUBLIC_IP}" >&2
+
