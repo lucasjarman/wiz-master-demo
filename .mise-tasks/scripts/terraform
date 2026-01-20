@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Terraform wrapper that auto-appends -backend-config=backend.hcl to init
+# Supports: env vars, AWS_PROFILE, SSO, IMDS, credential_process
+
+real_terraform=$(mise which terraform 2>/dev/null || which terraform)
+real_aws=$(mise which aws 2>/dev/null || which aws)
+
+# Validate AWS credentials
+if ! "$real_aws" sts get-caller-identity &>/dev/null; then
+  echo "ERROR: No valid AWS credentials found." >&2
+  echo "  Supported methods:" >&2
+  echo "    - Environment: AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY" >&2
+  echo "    - Profile: AWS_PROFILE or --profile" >&2
+  echo "    - SSO: aws sso login" >&2
+  echo "    - 1Password: eval \"\$(mise run auth)\"" >&2
+  exit 1
+fi
+
+if [[ $1 == "init" ]]; then
+  "$real_terraform" init -backend-config=backend.hcl "${@:2}"
+else
+  "$real_terraform" "$@"
+fi
+

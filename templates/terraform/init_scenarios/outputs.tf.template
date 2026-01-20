@@ -1,0 +1,6 @@
+# Place all terraform outputs in this file
+# Example:
+# output "example_output" {
+#   description = "Description of the output"
+#   value       = some_resource.id
+# }

@@ -1,0 +1,10 @@
+# {{SCENARIO_NAME}} Implementation
+
+## Overview
+This directory contains the implementation of the {{SCENARIO_NAME}} scenario for {{CLOUD_TYPE}}.
+
+## Prerequisites
+- Appropriate cloud provider credentials configured
+
+<!-- BEGIN_TF_DOCS -->
+<!-- END_TF_DOCS -->

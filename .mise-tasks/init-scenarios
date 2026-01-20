@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+#MISE description="Initialize a new demo scenario with optional cloud providers"
+#MISE dir="{{cwd}}"
+
+#USAGE flag "--clouds <clouds>" help="Optional: Comma-separated list of cloud providers (AWS,Azure,GCP)"
+#USAGE flag "--name <name>" help="Name of the scenario to create"
+#USAGE flag "--modules" help="Whether to create a modules subdirectory"
+
+set -eo pipefail
+
+# shellcheck disable=SC2154
+if [ -z "$usage_name" ]; then
+  echo "Error: --name parameter is required"
+  exit 1
+fi
+
+check_directory_exists() {
+  local dir="$1"
+  local allow_parent="${2:-false}"
+
+  if [ -d "$dir" ]; then
+    if [ "$allow_parent" = "true" ]; then
+      return 1
+    else
+      return 0
+    fi
+  fi
+  return 1
+}
+
+TEMPLATE_DIR="$GIT_ROOT/templates/terraform/init_scenarios"
+
+process_template() {
+  local template_file="$1"
+  local output_file="$2"
+  local cloud_type="$3"
+  local is_module="${4:-false}"
+
+  local temp_file
+  temp_file=$(mktemp)
+  cp "$template_file" "$temp_file"
+
+  if [[ $OSTYPE == "darwin"* ]]; then
+    sed -i '' "s/{{SCENARIO_NAME}}/$usage_name/g" "$temp_file"
+    sed -i '' "s/{{CLOUD_TYPE}}/$cloud_type/g" "$temp_file"
+  else
+    sed -i "s/{{SCENARIO_NAME}}/$usage_name/g" "$temp_file"
+    sed -i "s/{{CLOUD_TYPE}}/$cloud_type/g" "$temp_file"
+  fi
+
+  awk -v cloud="$cloud_type" -v module="$is_module" '
+        BEGIN {
+            skip = 0
+        }
+
+        # Module conditionals
+        /{{#if_module}}/ {
+            if (module == "true") skip = 0; else skip = 1
+            next
+        }
+        /{{#if_not_module}}/ {
+            if (module == "false") skip = 0; else skip = 1
+            next
+        }
+        /{{\/if_(not_)?module}}/ {
+            skip = 0
+            next
+        }
+
+        # Cloud conditionals (only process if not already skipping)
+        /{{#if_aws}}/ {
+            if (skip == 0) {
+                if (cloud == "aws") skip = 0; else skip = 2
+            }
+            next
+        }
+        /{{#if_azure}}/ {
+            if (skip == 0) {
+                if (cloud == "azure") skip = 0; else skip = 2
+            }
+            next
+        }
+        /{{#if_gcp}}/ {
+            if (skip == 0) {
+                if (cloud == "gcp") skip = 0; else skip = 2
+            }
+            next
+        }
+        /{{\/if_(aws|azure|gcp)}}/ {
+            if (skip == 2) skip = 0
+            next
+        }
+
+        # Print line only if not skipping
+        skip == 0 { print }
+    ' "$temp_file" >"$output_file"
+
+  rm "$temp_file"
+}
+
+copy_template_files() {
+  local target_dir="$1"
+  local cloud_type="${2:-}"
+
+  for template in "$TEMPLATE_DIR"/*.template; do
+    if [ -f "$template" ]; then
+      filename=$(basename "$template" .template)
+      process_template "$template" "$target_dir/$filename" "$cloud_type" "false"
+    fi
+  done
+}
+
+create_module_files() {
+  local target_dir="$1"
+
+  for template in "$TEMPLATE_DIR"/*.template; do
+    if [ -f "$template" ]; then
+      filename=$(basename "$template" .template)
+
+      if [ "$filename" = "providers.tf" ]; then
+        continue
+      fi
+
+      process_template "$template" "$target_dir/$filename" "" "true"
+    fi
+  done
+}
+
+SCENARIO_DIR="$GIT_ROOT/scenarios/$usage_name"
+
+if check_directory_exists "$SCENARIO_DIR" true; then
+  echo "Directory '$SCENARIO_DIR' already exists checking if we should add files."
+fi
+
+mkdir -p "$SCENARIO_DIR"
+
+# Check if --clouds was specified
+# shellcheck disable=SC2154
+if [ -n "$usage_clouds" ]; then
+  IFS=',' read -ra CLOUDS <<<"$usage_clouds"
+
+  for cloud in "${CLOUDS[@]}"; do
+    cloud_lower=$(echo "$cloud" | tr '[:upper:]' '[:lower:]')
+    cloud_dir="$SCENARIO_DIR/$cloud_lower"
+
+    if check_directory_exists "$cloud_dir"; then
+      echo "Directory $cloud_dir already exists, skipping..."
+      if [ "$usage_modules" = "true" ]; then
+        modules_dir="$cloud_dir/modules"
+        if [ ! -d "$modules_dir" ]; then
+          echo "Adding modules to existing directory $cloud_dir"
+          mkdir -p "$modules_dir"
+          create_module_files "$modules_dir"
+        else
+          echo "Modules directory already exists in $cloud_dir, skipping..."
+        fi
+      fi
+      continue
+    fi
+
+    echo "Creating $cloud implementation in $cloud_dir"
+    mkdir -p "$cloud_dir"
+
+    # Use template system instead of create_standard_files
+    copy_template_files "$cloud_dir" "$cloud_lower"
+
+    # Create modules if requested
+    if [ "$usage_modules" = "true" ]; then
+      modules_dir="$cloud_dir/modules"
+      mkdir -p "$modules_dir"
+      create_module_files "$modules_dir"
+    fi
+  done
+
+  if [ ! -f "$SCENARIO_DIR/README.md" ]; then
+    cat >"$SCENARIO_DIR/README.md" <<EOF
+# $usage_name Scenario
+
+## Overview
+This scenario demonstrates infrastructure deployment across multiple cloud providers:
+$(printf -- "- %s\n" "${CLOUDS[@]}")
+
+## Structure
+EOF
+  fi
+
+else
+  check_directory_exists "$SCENARIO_DIR"
+  mkdir -p "$SCENARIO_DIR"
+  # Use template system for single directory scenario
+  copy_template_files "$SCENARIO_DIR" "$usage_name"
+
+  # Create modules if requested
+  if [ "$usage_modules" = "true" ]; then
+    modules_dir="$SCENARIO_DIR/modules"
+    mkdir -p "$modules_dir"
+    create_module_files "$modules_dir"
+  fi
+fi
+
+echo "Successfully created scenario $usage_name"
+if [ -n "$usage_clouds" ]; then
+  echo "Created implementations for: ${CLOUDS[*]}"
+fi

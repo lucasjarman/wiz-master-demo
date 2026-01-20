@@ -1,0 +1,30 @@
+# Configure the required terraform version and providers to use here
+terraform {
+  required_version = "1.13.5" # Update as required
+  required_providers {
+{{#if_not_module}}
+{{#if_aws}}
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.83"           # Update as required
+    }
+{{/if_aws}}
+{{#if_azure}}
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.21"               # Update as required
+    }
+{{/if_azure}}
+{{#if_gcp}}
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 6.24" # Update as required
+    }
+{{/if_gcp}}
+    onepassword = {
+      source  = "1Password/onepassword"
+      version = "2.1.2"
+    }
+{{/if_not_module}}
+  }
+}

@@ -1,0 +1,97 @@
+# =============================================================================
+# mise.local.toml - Local Development Configuration
+# =============================================================================
+# This file is for local overrides and personal development settings.
+# It should be copied to mise.local.toml in the project root and customized.
+# NOTE: mise.local.toml is gitignored - do not commit your local config.
+# =============================================================================
+
+[tools]
+# Add any additional tools you find helpful here.
+# Consider suggesting additions to the main mise.toml for team-wide use.
+
+[env]
+# =============================================================================
+# FNOX Profile Configuration
+# =============================================================================
+# Set your fnox profile for credential management
+FNOX_PROFILE="dev"
+
+# =============================================================================
+# Wiz Environment Configuration
+# =============================================================================
+# For development work, wiz_env is typically set to prod
+WIZ_ENVIRONMENT="prod"
+TF_VAR_wiz_client_environment="prod"
+
+# =============================================================================
+# AWS Region Configuration
+# =============================================================================
+AWS_REGION="us-east-2"
+TF_VAR_aws_region="us-east-2"
+
+# =============================================================================
+# Terraform Pipeline Variables
+# =============================================================================
+# Set to false for local development (not running in CI/CD pipeline)
+TF_VAR_is_pipeline="false"
+
+# =============================================================================
+# AWS Infrastructure Toggles
+# =============================================================================
+# Control which AWS resources are created
+
+# Enable/disable Kubernetes (EKS) cluster creation
+TF_VAR_create_k8s_cluster="true"
+
+# Enable/disable VPC creation
+TF_VAR_create_vpc="true"
+
+# Enable/disable GuardDuty (AWS threat detection)
+TF_VAR_create_guardduty="false"
+
+# =============================================================================
+# Network Access Control
+# =============================================================================
+# Allowed CIDRs for accessing the demo application
+# Add your IP address for demo access (e.g., '["YOUR_IP/32"]')
+TF_VAR_allowed_cidrs='[]'
+
+# Wiz Dynamic Scanner IPs (for attack surface scanning)
+# These are region-specific - update based on your Wiz tenant region
+# See: https://docs.wiz.io/wiz-docs/docs/dynamic-scanner-ip-addresses
+TF_VAR_dynamic_scanner_ipv4s_develop="54.153.167.0/32,54.206.253.144/32,54.66.162.244/32,13.238.102.51/32,54.66.150.182/32,3.24.191.170/32"
+
+# =============================================================================
+# Scenario Toggles
+# =============================================================================
+# Enable/disable specific demo scenarios
+TF_VAR_deploy_react2shell="true"
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+# Control which logging services are enabled
+# Set individual log types to true/false as needed
+TF_VAR_enabled_logs='{"vpc_flow_logs":true,"cloudtrail":true,"s3_access_logging":true,"route53_logs":true}'
+
+# =============================================================================
+# Shell Hooks for fnox Activation
+# =============================================================================
+# These hooks automatically activate/deactivate fnox when entering/leaving
+# the project directory. Change "zsh" to your shell type if using bash or fish.
+
+[hooks.enter]
+shell = "zsh"
+script = """
+export OP_ACCOUNT=$(op account ls --format json | jq -r '.[] | select(.url | contains("wiz")) | .account_uuid')
+eval \"$(fnox activate zsh)\"
+"""
+
+[hooks.leave]
+shell = "zsh"
+script = """
+eval \"$(fnox deactivate)\"
+unset OP_ACCOUNT
+"""
+

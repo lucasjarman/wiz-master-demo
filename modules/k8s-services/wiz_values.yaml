@@ -1,0 +1,76 @@
+resources:
+  - apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: wiz-k8s-integration
+      namespace: ${kubernetes_namespace_argocd}
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: 'https://wiz-sec.github.io/charts'
+        targetRevision: 0.*
+        helm:
+          values: |+
+            global:
+              wizApiToken:
+                clientId: ${wiz_k8s_integration_client_id}
+                clientToken: ${wiz_k8s_integration_client_secret}
+                clientEndpoint: ${wiz_k8s_integration_client_endpoint}
+            wiz-admission-controller:
+              enabled: ${use_wiz_admission_controller}
+            wiz-kubernetes-connector:
+              enabled: true
+              broker:
+                enabled: true
+              autoCreateConnector:
+                connectorName: ${kubernetes_connector_name}
+                clusterFlavor: ${cluster_type}
+                autoDeleteConnectorEnabled: true
+            wiz-sensor:
+              enabled: ${use_wiz_sensor}
+              imagePullSecret:
+                username: ${wiz_sensor_pull_username}
+                password: ${wiz_sensor_pull_password}
+              apiSecurity:
+                enabled: true
+              forensics:
+                enabled: true
+              daemonset:
+                sensorHostCacheCreate: true
+                sensorHostCacheFolder: /var/lib/wiz/
+                tolerations:
+                  - operator: Exists
+                affinity:
+                  nodeAffinity:
+                    requiredDuringSchedulingIgnoredDuringExecution:
+                      nodeSelectorTerms:
+                      - matchExpressions:
+                        - key: kubernetes.io/os
+                          operator: In
+                          values:
+                          - linux
+                        - key: kubernetes.io/arch
+                          operator: In
+                          values:
+                          - arm64
+                          - amd64
+                        - key: eks.amazonaws.com/compute-type
+                          operator: NotIn
+                          values:
+                          - fargate
+        chart: wiz-kubernetes-integration
+      destination:
+        server: 'https://kubernetes.default.svc'
+        namespace: ${kubernetes_namespace_wiz}
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - PruneLast=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true
+          - CreateNamespace=true
+

@@ -1,0 +1,33 @@
+# fnox.toml template for wiz-master-demo
+# Copy this file to the project root as fnox.toml and update the 1Password item names
+# to match your own 1Password structure.
+#
+# Usage:
+#   cp templates/fnox.toml.template fnox.toml
+#   # Edit fnox.toml to use your 1Password item names
+#   fnox exec -- <command>
+
+if_missing = "warn"
+
+[providers.1pass]
+type = "1password"
+vault = "Employee"
+
+[secrets]
+[profiles.dev.secrets]
+
+###### Tenant Credentials
+# Update "wizautesting-sa" and "wizautesting" to match your 1Password item names
+# These items should contain your Wiz service account and tenant configuration
+WIZ_CLIENT_ID={provider="1pass", value="wizautesting-sa/username"}
+WIZ_CLIENT_SECRET={provider="1pass", value="wizautesting-sa/credential"}
+TF_VAR_tenant_image_pull_username={provider="1pass", value="wizautesting/Username"}
+TF_VAR_tenant_image_pull_password={provider="1pass", value="wizautesting/Password"}
+TF_VAR_wiz_trusted_arn={provider="1pass", value="wizautesting/trustedArn"}
+TF_VAR_wiz_tenant_id={provider="1pass", value="wizautesting/tenantId"}
+
+###### AWS Credentials
+# Update "skilljar-dev-aws" to match your 1Password item name for AWS credentials
+AWS_ACCESS_KEY_ID={provider="1pass", value="skilljar-dev-aws/username"}
+AWS_SECRET_ACCESS_KEY={provider="1pass", value="skilljar-dev-aws/credential"}
+

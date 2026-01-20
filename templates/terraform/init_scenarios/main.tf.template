@@ -1,0 +1,103 @@
+# Place all terraform resource configurations in this file
+
+{{#if_not_module}}
+locals {
+  # NOTE: If you have a need to expose resources publicly, ensure you use local.dynamic_scanner_ipv4s.
+
+  # dynamic_scanner_ipv4s = local.environment == "prod" || local.environment == "staging" ? var.dynamic_scanner_ipv4s_demo : var.dynamic_scanner_ipv4s_develop
+  backend_config_json = jsondecode(file(var.backend_config_json_path))
+  environment         = local.backend_config_json.environment
+  branch              = local.backend_config_json.branch
+  random_prefix_id    = local.backend_config_json.random_prefix_id
+  path_parts          = split("/", path.cwd)
+  cloud               = local.path_parts[length(local.path_parts) - 1]
+
+{{#if_gcp}}
+  labels = merge(var.common_labels, {
+    #### Service name####
+    # If you want to tag resources with the service_name to align them to service_catalog, add var.service_name to their tag field
+    #####################
+    # service: var.service_name,
+
+    environment : local.environment,
+    branch : local.branch,
+    cloud : local.cloud
+  })
+{{/if_gcp}}
+{{#if_aws}}
+  tags = merge(var.common_tags, {
+    #### Service name####
+    # If you want to tag resources with the service_name to align them to service_catalog, add var.service_name to their tag field
+    #####################
+    # service: var.service_name,
+
+    environment : local.environment,
+    branch : local.branch,
+    extend : "true",
+    cloud : local.cloud
+  })
+{{/if_aws}}
+{{#if_azure}}
+  tags = merge(var.common_tags, {
+    #### Service name####
+    # If you want to tag resources with the service_name to align them to service_catalog, add var.service_name to their tag field
+    #####################
+    # service: var.service_name,
+
+    environment : local.environment,
+    branch : local.branch,
+    extend : "true",
+    cloud : local.cloud
+  })
+{{/if_azure}}
+  name = "${var.prefix}-${local.random_prefix_id}"
+}
+{{/if_not_module}}
+
+{{#if_module}}
+locals {
+  # Define local variables here
+}
+{{/if_module}}
+
+
+# This is if you need to access any outputs that are created upstream in the Wiz_tenant or the Shared Resource folders
+# data "terraform_remote_state" "wiz_tenant" {
+#   backend = "s3"
+#   config = {
+#     bucket = local.backend_config_json.state.bucket
+#     key    = local.environment == "staging" ? "infrastructure/wiz/stg-advanced/terraform.tfstate" : local.environment == "prod" ? "infrastructure/wiz/advanced/terraform.tfstate" : "infrastructure/wiz/develop/terraform.tfstate"
+#     region = local.backend_config_json.state.region
+#   }
+# }
+
+{{#if_aws}}
+# data "terraform_remote_state" "shared_resources" {
+#   backend = "s3"
+#   config = {
+#     bucket = local.backend_config_json.state.bucket
+#     key    = "infrastructure/shared/aws/terraform.tfstate"
+#     region = local.backend_config_json.state.region
+#   }
+# }
+{{/if_aws}}
+{{#if_azure}}
+# data "terraform_remote_state" "shared_resources" {
+#   backend = "s3"
+#   config = {
+#     bucket = local.backend_config_json.state.bucket
+#     key    = "infrastructure/shared/azure/terraform.tfstate"
+#     region = local.backend_config_json.state.region
+#   }
+# }
+{{/if_azure}}
+{{#if_gcp}}
+# data "terraform_remote_state" "shared_resources" {
+#   backend = "s3"
+#   config = {
+#     bucket = local.backend_config_json.state.bucket
+#     key    = "infrastructure/shared/gcp/terraform.tfstate"
+#     region = local.backend_config_json.state.region
+#   }
+# }
+{{/if_gcp}}

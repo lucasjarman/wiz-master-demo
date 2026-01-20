@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Export secrets to current shell"
+
+# This outputs the export commands - use with eval "$(mise run auth)"
+fnox export --profile dev --format env
+

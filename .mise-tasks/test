@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#MISE description="Run infrastructure integration tests"
+
+#USAGE flag "-v --verbose" help="Enable verbose test output"
+#USAGE flag "-l --list" help="List available test suites"
+#USAGE arg "[suites...]" help="Test suites to run (network-policy, argocd, wiz, app, s3, wiz-defend, all)"
+
+set -eo pipefail
+
+TEST_SCRIPT="$GIT_ROOT/tests/test_infrastructure.sh"
+
+# Check test script exists
+if [[ ! -x "$TEST_SCRIPT" ]]; then
+  echo "[ERROR]: Test script not found or not executable: $TEST_SCRIPT"
+  echo "[INFO]: Run: chmod +x tests/*.sh"
+  exit 1
+fi
+
+# Build arguments
+ARGS=()
+
+if [[ "${usage_verbose:-}" == "true" ]]; then
+  ARGS+=("--verbose")
+fi
+
+if [[ "${usage_list:-}" == "true" ]]; then
+  ARGS+=("--list")
+fi
+
+# Add any suite arguments
+if [[ -n "${usage_suites:-}" ]]; then
+  # Split the suites string into array
+  IFS=' ' read -ra SUITE_ARRAY <<< "$usage_suites"
+  ARGS+=("${SUITE_ARRAY[@]}")
+fi
+
+# Run tests
+echo "[INFO]: Running infrastructure tests..."
+exec "$TEST_SCRIPT" "${ARGS[@]}"
+

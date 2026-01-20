@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+#MISE description="WARN: Destroys the demo environment! THIS SHOULD ONLY BE USED ON LOCAL DEVELOPMENT BRANCHES. USE WITH EXTREME CAUTION"
+
+#USAGE flag "--backend" help="When this flag is used, it will also destroy the backend"
+#USAGE flag "--no-dry-run" help="Execute actual destruction. Without this flag, only shows what would be destroyed"
+#USAGE flag "--path <path>" help="Runs this file against a specific path or subpaths. Usage is as follows --path scenario1/aws"
+set -eo pipefail
+
+directories=()
+if [ -n "$usage_path" ]; then
+  directories+=("$usage_path")
+else
+  directories+=("scenarios" "infrastructure/wiz" "infrastructure/shared")
+fi
+
+DRY_RUN=true
+# shellcheck disable=SC2154
+if [ "$usage_no_dry_run" = "true" ]; then
+  DRY_RUN=false
+fi
+
+if [ ! -f "$CONFIG_PATH" ]; then
+  echo "Backend config not found at: $CONFIG_PATH"
+  echo "Run tf-bootstrap-backend first."
+  exit 1
+fi
+
+ENVIRONMENT=$(jq -r '.environment' "$CONFIG_PATH")
+CONFIG_BRANCH=$(jq -r '.branch' "$CONFIG_PATH")
+BUCKET=$(jq -r '.state.bucket' "$CONFIG_PATH")
+GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+if [[ $CONFIG_BRANCH == "main" || $CONFIG_BRANCH == "staging" ]]; then
+  echo "The current backend-config.json shows the branch as $CONFIG_BRANCH, do not destroy resources in the main or staging branch"
+  exit 1
+elif [[ $GIT_BRANCH == "main" || $GIT_BRANCH == "staging" ]]; then
+  echo "You are currently on $GIT_BRANCH. Please switch to your dev branch. DO NOT destroy resources in the main or staging branch"
+  exit 1
+fi
+
+# shellcheck disable=SC2154
+if [ "$usage_backend" = "true" ]; then
+  directories+=("infrastructure/backends")
+fi
+
+DELETE_ERRORS=0
+FAILED_FOLDERS=()
+
+process_directory() {
+  local dir="$1"
+  echo "Evaluating if directory needs to be deleted: $dir"
+  if [[ -n $(find "$dir" -maxdepth 1 -name "*.tf" 2>/dev/null) ]]; then
+    if [[ -f "$dir/backend.tf" ]]; then
+      echo "Found backend.tf in $dir"
+      if [[ -f "$dir/backend.hcl" ]] && ! grep -q "bucket.*=.*\"$BUCKET\"" "$dir/backend.hcl"; then
+        echo "[WARNING]: Skipping $dir as backend bucket is not the same as the current bucket specified in backend-config.json"
+        return
+      fi
+      cd "$dir"
+      echo "Destroying resources in $dir"
+      if [ "$DRY_RUN" = "false" ]; then
+        if ! eval "terraform destroy -auto-approve"; then
+          echo "Failed to destroy resources in $dir"
+          DELETE_ERRORS=1
+          FAILED_FOLDERS+=("$dir")
+        fi
+      else
+        echo "[DRY RUN] Would run: terraform destroy -auto-approve in $dir"
+        if ! eval "terraform plan -destroy"; then
+          echo "Failed to plan destroy in $dir"
+          DELETE_ERRORS=1
+          FAILED_FOLDERS+=("$dir")
+        fi
+      fi
+      cd "$GIT_ROOT"
+    else
+      echo "No backend.tf found in $dir, skipping"
+      return
+    fi
+  fi
+}
+
+if [ "$DRY_RUN" = "true" ]; then
+  echo "=== DRY RUN MODE: No resources will be destroyed ==="
+  echo "Use --no-dry-run flag to actually destroy resources"
+  echo "==================================================="
+  echo "THIS WILL DESTROY ALL RESOURCES IN THE FOLLOWING ENVIRONMENT"
+  echo "==================================================="
+  echo "Environment: $ENVIRONMENT"
+  echo "Branch: $CONFIG_BRANCH"
+  echo "==================================================="
+  echo "You are currently authenticated to AWS as:"
+  aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "(unable to get identity)"
+  echo "==================================================="
+  sleep 5
+else
+  echo "=== WARNING: You are about to destroy resources! ==="
+  echo "THIS WILL DESTROY ALL RESOURCES IN THE FOLLOWING ENVIRONMENT"
+  echo "==================================================="
+  echo "Environment: $ENVIRONMENT"
+  echo "Branch: $CONFIG_BRANCH"
+  echo "==================================================="
+  echo "You are currently authenticated to AWS as:"
+  aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "(unable to get identity)"
+  echo "==================================================="
+  echo "⚠️ You have 10 seconds to cancel this script by hitting CTRL-C twice if this is unintended ⚠️"
+  sleep 10
+fi
+
+# Clean up Kubernetes LoadBalancer services before destroying EKS
+# This prevents orphaned AWS LBs that block VPC deletion
+cleanup_k8s_loadbalancers() {
+  echo "=== Cleaning up Kubernetes LoadBalancer services ==="
+
+  # Check if kubectl is available and can connect
+  if ! kubectl cluster-info &>/dev/null; then
+    echo "Cannot connect to Kubernetes cluster (may already be destroyed). Skipping LB cleanup."
+    return 0
+  fi
+
+  # Get all LoadBalancer services across all namespaces
+  local lb_services
+  lb_services=$(kubectl get svc --all-namespaces -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}/{.metadata.name} {end}' 2>/dev/null || echo "")
+
+  if [ -z "$lb_services" ]; then
+    echo "No LoadBalancer services found."
+    return 0
+  fi
+
+  echo "Found LoadBalancer services: $lb_services"
+
+  for svc in $lb_services; do
+    ns=$(echo "$svc" | cut -d'/' -f1)
+    name=$(echo "$svc" | cut -d'/' -f2)
+    echo "Deleting LoadBalancer service: $name in namespace: $ns"
+    if [ "$DRY_RUN" = "false" ]; then
+      kubectl delete svc "$name" -n "$ns" --timeout=60s || echo "Warning: Failed to delete $svc"
+    else
+      echo "[DRY RUN] Would delete: kubectl delete svc $name -n $ns"
+    fi
+  done
+
+  # Wait for AWS LBs to be fully deprovisioned
+  if [ "$DRY_RUN" = "false" ]; then
+    echo "Waiting 30s for AWS Load Balancers to deprovision..."
+    sleep 30
+  fi
+}
+
+# Run LB cleanup before processing directories
+cleanup_k8s_loadbalancers
+
+for base_dir in "${directories[@]}"; do
+  full_path="$GIT_ROOT/$base_dir"
+  echo "Processing directory: $full_path"
+  if [[ $base_dir == "scenarios" ]]; then
+    for scenario_dir in "$full_path"/*/aws; do
+      if [[ -d $scenario_dir ]]; then
+        process_directory "$scenario_dir"
+      fi
+    done
+  else
+    subdirs=()
+    while IFS= read -r subdir; do
+      if [[ -d $subdir ]]; then
+        subdirs+=("$subdir")
+      fi
+    done < <(find "$full_path" -maxdepth 2 -type d | sort -r)
+    for dir in "${subdirs[@]}"; do
+      process_directory "$dir"
+    done
+  fi
+done
+
+if [ "$DELETE_ERRORS" -gt 0 ]; then
+  echo "=========================================================================="
+  echo "FAILURE: $DELETE_ERRORS directories failed during destroy"
+  echo "Failed Folders:"
+  for failed_dir in "${FAILED_FOLDERS[@]}"; do
+    echo "  - $failed_dir"
+  done
+  exit 1
+fi
+

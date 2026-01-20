@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#MISE description="Removes all backend.tf files from non-module directories"
+
+set -eo pipefail
+
+echo "[INFO]: Resetting all backend.tf files..."
+
+# Find and remove all backend.tf and backend.hcl files, excluding modules
+find "$GIT_ROOT" -type f \( -name "backend.tf" -o -name "backend.hcl" \) \
+  -not -path "*/modules/*" \
+  -not -path "*/.terraform/*" \
+  -exec rm -v {} \;
+
+echo "[INFO]: Backend reset complete."
+

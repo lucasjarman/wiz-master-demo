@@ -1,0 +1,43 @@
+---
+# NetworkPolicy for React2Shell Demo
+#
+# Purpose: Actually restrict traffic at the pod level while keeping AWS
+# Security Groups open (0.0.0.0/0) so Wiz evaluates the "publicly exposed"
+# risk in the attack graph.
+#
+# How it works:
+# - Service uses externalTrafficPolicy: Local + preserve_client_ip.enabled=true
+# - This means the pod sees the REAL client source IP (not the node IP)
+# - NetworkPolicy then filters based on actual client IP
+#
+# Allows:
+# - Wiz Dynamic Scanner IPs (for vulnerability scanning)
+# - VPC internal traffic (for NLB health checks, pod-to-pod comms)
+# - Custom allowed IPs (e.g., your home IP for demos)
+#
+# Result: Wiz sees "publicly exposed" but real attackers are blocked
+#
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ${name}-ingress-policy
+  namespace: ${namespace}
+  labels:
+    app: ${name}
+spec:
+  podSelector:
+    matchLabels:
+      app: ${name}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    # VPC CIDR - allows NLB health checks and internal cluster traffic
+    - ipBlock:
+        cidr: ${vpc_cidr}
+%{ for cidr in allowed_cidrs ~}
+    # Allowed external CIDR (Wiz scanners + custom IPs)
+    - ipBlock:
+        cidr: ${cidr}
+%{ endfor ~}
+

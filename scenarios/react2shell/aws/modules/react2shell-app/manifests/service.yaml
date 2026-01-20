@@ -1,0 +1,27 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${name}
+  namespace: ${namespace}
+  labels:
+    app: ${name}
+  annotations:
+    # NLB for public exposure (Wiz sees "publicly exposed" in attack graph)
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    # Preserve client IP so NetworkPolicy can filter by source IP
+    service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: preserve_client_ip.enabled=true
+spec:
+  type: LoadBalancer
+  # Local policy required to preserve client source IP for NetworkPolicy filtering
+  externalTrafficPolicy: Local
+  selector:
+    app: ${name}
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+      name: http
+

@@ -1,78 +1,193 @@
-# Wiz React2Shell Demo
+# Wiz Master Demo
 
-A deliberately vulnerable Next.js application demonstrating **CVE-2025-66478** - React Server Components Remote Code Execution.
+**Repeatable, simple infrastructure for Wiz security demonstrations.**
+
+This repository provides a clean, deployable demo environment showcasing Wiz platform capabilities through intentionally vulnerable infrastructure. Deploy from scratch in minutes with minimal commands.
 
 ## ⚠️ Security Warning
 
 > **DO NOT DEPLOY TO PRODUCTION**
-> 
-> This repository contains intentionally vulnerable code for security demonstration purposes only.
+>
+> This repository contains intentionally vulnerable code and over-permissive IAM policies for security demonstration purposes only.
 
-## Vulnerability Details
+---
+
+## Goals
+
+1. **Repeatable** - Deploy identical environments from scratch every time
+2. **Simple** - Minimal commands to go from zero to working demo
+3. **Portable** - Works across different AWS accounts and regions
+4. **Extensible** - Easy to add new scenarios (Azure, GCP placeholders ready)
+
+---
+
+## What This Demonstrates
+
+| Wiz Product | Capability |
+|-------------|------------|
+| **Wiz Cloud** | Graph visualization of "Toxic Combinations" - Public Exposure + Vulnerability + Identity + Sensitive Data |
+| **Wiz Defend** | Runtime detection of RCE behavior, lateral movement, and data exfiltration |
+| **Wiz Code** | Detection of vulnerable dependencies and risky IaC configurations |
+
+### Attack Path (Golden State)
+
+```
+Internet (0.0.0.0/0) → NLB → EKS Pod (RCE) → Service Account (IRSA) → IAM Role → S3 Bucket (Sensitive Data)
+```
+
+### Current Scenario: React2Shell
 
 | Component | Version | CVE |
 |-----------|---------|-----|
 | Next.js | 16.0.6 | CVE-2025-66478 |
 | React | 19.2.0 | - |
 
-This version of Next.js contains a critical vulnerability in how React Server Components deserialize flight data, allowing Remote Code Execution.
+A React Server Components deserialization vulnerability enabling Remote Code Execution via the `Next-Action` header.
 
-### Built From Template
+---
 
-This app was scaffolded using the official `create-next-app` template:
-
-```bash
-npx create-next-app@16.0.6 app/nextjs --typescript --tailwind --eslint --app --src-dir
-```
-
-The template itself is vulnerable out-of-the-box—no additional exploit code was added.
-
-## Project Structure
+## Repository Structure
 
 ```
-├── app/nextjs/          # Vulnerable Next.js application
-│   ├── src/app/         # App router pages
-│   ├── Dockerfile       # Container build
-│   └── package.json     # Dependencies (pinned to vulnerable versions)
-├── infra/aws/           # Terraform infrastructure
-│   ├── main.tf          # VPC, EKS, S3, ECR
-│   └── variables.tf     # Configuration
-└── infra/k8s/           # Kubernetes manifests (TODO)
+.
+├── infrastructure/
+│   ├── shared/aws/              # Shared infrastructure (VPC, EKS, logging)
+│   ├── wiz/develop/             # Wiz tenant configuration (connectors, sensors)
+│   └── backends/                # Bootstrap terraform for S3 state bucket
+├── scenarios/
+│   └── react2shell/aws/         # React2Shell demo scenario (app, S3, IRSA)
+├── modules/
+│   ├── aws/                     # Reusable AWS modules
+│   ├── k8s-services/            # ArgoCD + Wiz K8s integration
+│   ├── azure/                   # (Placeholder) Azure modules
+│   └── gcp/                     # (Placeholder) GCP modules
+├── app/nextjs/                  # Vulnerable Next.js application
+├── scripts/exploit/             # Demo exploit scripts
+├── tests/                       # Infrastructure validation tests
+├── templates/
+│   ├── fnox.toml.template       # 1Password secrets template
+│   ├── mise.local.toml.template # Local environment config
+│   └── terraform/               # Scenario scaffolding templates
+└── .mise-tasks/                 # Mise task definitions
 ```
+
+---
 
 ## Quick Start
 
-### Local Development
+### Prerequisites
+
+- [mise](https://mise.jdx.dev/) - Polyglot runtime manager
+- [1Password CLI](https://developer.1password.com/docs/cli/) - Secrets management
+- AWS credentials with appropriate permissions
+
+### Deploy from Scratch
+
+```bash
+# 1. Install tools
+mise trust && mise install
+
+# 2. Setup local configuration
+cp templates/fnox.toml.template fnox.toml
+cp templates/mise.local.toml.template mise.local.toml
+# Edit fnox.toml with your 1Password item references
+
+# 3. Authenticate (once per terminal session)
+eval "$(mise run auth)"
+
+# 4. Bootstrap state backend
+mise run bootstrap-branch --directories infrastructure/shared/aws,scenarios/react2shell/aws
+
+# 5. Deploy infrastructure
+mise run apply-demo --path infrastructure/shared/aws
+mise run apply-demo --path scenarios/react2shell/aws
+
+# 6. Validate deployment
+mise run test
+```
+
+### Local App Development
 
 ```bash
 cd app/nextjs
 npm install
 npm run dev
+# Access at http://localhost:3000
 ```
 
-### Docker
+---
+
+## Mise Tasks
+
+| Task | Description |
+|------|-------------|
+| `eval "$(mise run auth)"` | Export secrets to shell (authenticate once) |
+| `mise run bootstrap-branch` | Bootstrap S3 state backend and init terraform |
+| `mise run apply-demo --path <path>` | Apply terraform in a specific directory |
+| `mise run apply-demo --plan --path <path>` | Plan terraform changes |
+| `mise run apply-demo --all` | Deploy all infrastructure in order |
+| `mise run build-image --push` | Build and push container image to ECR |
+| `mise run test` | Run infrastructure integration tests |
+| `mise run test argocd wiz` | Run specific test suites |
+| `mise run init-scenarios --name <name> --clouds AWS` | Scaffold a new scenario |
+| `mise run local-dev:destroy-dev-environment` | Destroy all resources |
+
+---
+
+## Key Technical Details
+
+### Secrets Management
+
+Secrets are fetched from 1Password at runtime via `fnox`. Authenticate once per terminal session to avoid repeated prompts:
 
 ```bash
-cd app/nextjs
-docker build -t wiz-rsc-demo:latest .
-docker run --rm -p 3000:3000 wiz-rsc-demo:latest
+eval "$(mise run auth)"
 ```
 
-Access at: http://localhost:3000
+### State Management
 
-## Demo Purpose
+Terraform state is stored in S3 with DynamoDB locking. The `backend-config.json` file is auto-generated by `mise run bootstrap-branch`.
 
-This environment is designed to demonstrate:
+### Resource Naming
 
-- **Wiz Code**: Detects vulnerable dependencies and hardcoded secrets in IaC
-- **Wiz Cloud**: Discovers misconfigured S3 buckets and over-permissive IAM roles
-- **Wiz Defend**: Detects runtime exploitation (RCE, file writes, AWS API calls)
+Resources use a `random_prefix_id` from `backend-config.json` for uniqueness and clean rotations.
 
-## Attack Path
+### Identity (IRSA)
 
+Uses AWS IAM Roles for Service Accounts with intentionally over-permissive policies to demonstrate the attack path.
+
+---
+
+## Adding New Scenarios
+
+```bash
+# Create a new scenario with AWS implementation
+mise run init-scenarios --name my-new-scenario --clouds AWS
+
+# Creates:
+# scenarios/my-new-scenario/aws/
+#   ├── main.tf
+#   ├── variables.tf
+#   ├── outputs.tf
+#   ├── providers.tf
+#   └── versions.tf
 ```
-Internet → LoadBalancer → EKS Pod (RCE) → Node IAM Role → Sensitive S3 Bucket
+
+---
+
+## Testing
+
+```bash
+# Run all tests
+mise run test
+
+# Run specific test suites
+mise run test argocd wiz app
+
+# Available suites: network-policy, argocd, wiz, app, s3, wiz-defend
 ```
+
+---
 
 ## License
 

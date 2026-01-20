@@ -1,0 +1,20 @@
+{{#if_not_module}}
+# Configure providers and their settings here
+{{#if_aws}}
+provider "aws" {
+  default_tags {
+    tags = local.tags
+  }
+}
+{{/if_aws}}
+{{#if_azure}}
+provider "azurerm" {
+  features {}
+}
+{{/if_azure}}
+{{#if_gcp}}
+provider "google" {
+  default_labels = local.labels
+}
+{{/if_gcp}}
+{{/if_not_module}}

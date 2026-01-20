@@ -1,0 +1,10 @@
+{
+  "state": {
+    "bucket": "wiz-demo-tfstate-lucasjarman",
+    "region": "ap-southeast-2"
+  },
+  "environment": "dev",
+  "branch": "iac-refactor",
+  "suffix": "v1"
+}
+

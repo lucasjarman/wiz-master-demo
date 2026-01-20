@@ -8,6 +8,23 @@
 *.tfstate.backup
 .terraform.lock.hcl
 *.tfvars
+!common.auto.tfvars
+*.tfplan
+backend.tf
+backend.hcl
+
+# Mise/fnox (local config)
+mise.local.toml
+fnox.toml
+kubeconfig
+
+# Secrets & Sensitive Files
+*.secrets.json
+secrets.env
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Node.js
 node_modules/
@@ -38,6 +55,10 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 
-# SSH Keys
-*.pem
-infra/aws/tfplan
+# Binary/Archive files (should not be in repo)
+*.zip
+*.tar.gz
+*.pdf
+
+# Legacy paths (no longer exist, kept for safety)
+infra/

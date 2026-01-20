@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+#MISE description="Apply Terraform configurations"
+
+#USAGE flag "--wiz-tenants" help="Applies the infrastructure for wiz-tenants to demo"
+#USAGE flag "--shared-resources" help="Applies the shared resources folders"
+#USAGE flag "--all-scenarios" help="Applies all scenarios"
+#USAGE flag "--path <path>" help="Specific path to apply (e.g., scenarios/react2shell/aws)"
+#USAGE flag "--plan" help="Run terraform plan instead of apply"
+#USAGE flag "--all" help="Apply all infrastructure and scenarios in order"
+
+set -eo pipefail
+
+ACTION="apply -auto-approve"
+if [ "${usage_plan:-}" = "true" ]; then
+  ACTION="plan"
+fi
+
+# Single path mode
+if [ -n "${usage_path:-}" ]; then
+  FULL_PATH="$GIT_ROOT/$usage_path"
+  if [ ! -d "$FULL_PATH" ]; then
+    echo "[ERROR]: Directory not found: $FULL_PATH"
+    exit 1
+  fi
+  echo "[INFO]: Running terraform $ACTION in $usage_path"
+  cd "$FULL_PATH"
+  terraform $ACTION
+  exit 0
+fi
+
+# Determine directories to process
+directories=()
+
+if [ "${usage_shared_resources:-}" = "true" ]; then
+  directories+=("infrastructure/shared/aws")
+elif [ "${usage_wiz_tenants:-}" = "true" ]; then
+  directories+=("infrastructure/wiz/develop")
+elif [ "${usage_all_scenarios:-}" = "true" ]; then
+  directories+=("scenarios")
+elif [ "${usage_all:-}" = "true" ]; then
+  # Full deployment order: shared -> wiz -> scenarios
+  directories+=("infrastructure/shared/aws" "infrastructure/wiz/develop" "scenarios")
+fi
+
+if [ ${#directories[@]} -eq 0 ]; then
+  echo "[INFO]: No directories specified. Use --all, --shared-resources, --wiz-tenants, --all-scenarios, or --path"
+  exit 1
+fi
+
+process_directory() {
+  local dir="$1"
+
+  if [[ -n $(find "$dir" -maxdepth 1 -name "*.tf" 2>/dev/null) ]]; then
+    if [[ -f "$dir/backend.tf" ]]; then
+      local rel_path="${dir#"$GIT_ROOT/"}"
+      echo "[INFO]: Running terraform $ACTION in $rel_path"
+      cd "$dir"
+      terraform $ACTION
+      cd "$GIT_ROOT"
+    fi
+  fi
+
+  # Process subdirectories
+  for subdir in "$dir"/*; do
+    if [[ -d $subdir ]] && [[ ! $subdir == *"/modules"* ]]; then
+      process_directory "$subdir"
+    fi
+  done
+}
+
+for base_dir in "${directories[@]}"; do
+  full_path="$GIT_ROOT/$base_dir"
+  echo "[INFO]: Processing $base_dir..."
+  process_directory "$full_path"
+done
+
+echo "[INFO]: Apply complete!"
+

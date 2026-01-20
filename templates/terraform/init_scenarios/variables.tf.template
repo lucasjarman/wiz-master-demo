@@ -1,0 +1,61 @@
+{{#if_not_module}}
+variable "backend_config_json_path" {
+  type        = string
+  description = "Location of backend configuration json"
+}
+
+variable "prefix" {
+  type        = string
+  description = "Prefix for all resources"
+  # Fill this in for your scenario.  If you dont have one, call it sc<scenario_number>
+}
+
+# variable "service_name" {
+#   type        = string
+#   description = "Service name for the scenario, if required"
+# }
+
+# NOTE: If you have a need to expose resources publicly, uncomment BOTH of these variable blocks and ensure you use local.dynamic_scanner_ipv4s in your security/fw rules.  See main.tf
+# variable "dynamic_scanner_ipv4s_demo" {
+#   type        = string
+#   description = "List of allowed dynamic scanner IPv4 CIDRs."
+#   default     = "54.78.133.42/32,54.220.121.66/32,18.202.52.49/32,52.209.199.63/32,54.220.187.83/32,99.80.118.149/32"
+# }
+
+# variable "dynamic_scanner_ipv4s_develop" {
+#   type        = string
+#   description = "List of allowed dynamic scanner IPv4 CIDRs from a non demo tenant."
+#   default     = ""
+# }
+
+{{#if_gcp}}
+variable "common_labels" {
+  type        = map(string)
+  description = "Labels to apply to all resources"
+  default     = {}
+}
+{{/if_gcp}}
+{{#if_aws}}
+variable "common_tags" {
+  type        = map(string)
+  description = "Tags to apply to all resources"
+  default     = {}
+}
+{{/if_aws}}
+{{#if_azure}}
+variable "common_tags" {
+  type        = map(string)
+  description = "Tags to apply to all resources"
+  default     = {}
+}
+{{/if_azure}}
+{{/if_not_module}}
+
+{{#if_module}}
+# Define module variables here
+# Example:
+# variable "example_variable" {
+#   type        = string
+#   description = "Description of the variable"
+# }
+{{/if_module}}

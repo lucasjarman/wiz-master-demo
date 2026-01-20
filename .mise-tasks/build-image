@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+#MISE description="Build and push container image to ECR"
+
+#USAGE flag "--app <app>" default="nextjs" help="Application to build (default: nextjs)"
+#USAGE flag "--tag <tag>" default="latest" help="Image tag (default: latest)"
+#USAGE flag "--push" help="Push image to ECR after building"
+#USAGE flag "--no-cache" help="Build without using cache"
+
+set -eo pipefail
+
+GIT_ROOT=$(git rev-parse --show-toplevel)
+BACKEND_CONFIG="$GIT_ROOT/infrastructure/backend-config.json"
+
+# Validate backend config exists
+if [[ ! -f "$BACKEND_CONFIG" ]]; then
+  echo "ERROR: backend-config.json not found. Run: mise run bootstrap-branch" >&2
+  exit 1
+fi
+
+# Read config
+REGION=$(jq -r '.state.region' "$BACKEND_CONFIG")
+APP_NAME="${usage_app:-nextjs}"
+TAG="${usage_tag:-latest}"
+APP_DIR="$GIT_ROOT/app/$APP_NAME"
+
+# Validate app directory exists
+if [[ ! -d "$APP_DIR" ]]; then
+  echo "ERROR: Application directory not found: $APP_DIR" >&2
+  echo "  Available apps:" >&2
+  ls -1 "$GIT_ROOT/app/" 2>/dev/null | sed 's/^/    - /' >&2
+  exit 1
+fi
+
+# Validate Dockerfile exists
+if [[ ! -f "$APP_DIR/Dockerfile" ]]; then
+  echo "ERROR: Dockerfile not found in $APP_DIR" >&2
+  exit 1
+fi
+
+# Get AWS account ID
+real_aws=$(mise which aws 2>/dev/null || which aws)
+if ! ACCOUNT_ID=$("$real_aws" sts get-caller-identity --query Account --output text 2>/dev/null); then
+  echo "ERROR: No valid AWS credentials found." >&2
+  echo "  Run: eval \"\$(mise run auth)\"" >&2
+  exit 1
+fi
+
+# ECR repository name matches terraform: wiz-demo-app
+ECR_REPO="wiz-demo-app"
+ECR_URL="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
+FULL_IMAGE="$ECR_URL/$ECR_REPO:$TAG"
+
+echo "=== Build Configuration ==="
+echo "  App:        $APP_NAME"
+echo "  Directory:  $APP_DIR"
+echo "  Tag:        $TAG"
+echo "  ECR Repo:   $ECR_REPO"
+echo "  Full Image: $FULL_IMAGE"
+echo ""
+
+# Build options
+BUILD_OPTS=()
+if [[ "${usage_no_cache:-}" == "true" ]]; then
+  BUILD_OPTS+=("--no-cache")
+fi
+
+# Build image
+echo "=== Building Image ==="
+docker build "${BUILD_OPTS[@]}" -t "$ECR_REPO:$TAG" -t "$FULL_IMAGE" "$APP_DIR"
+
+if [[ "${usage_push:-}" == "true" ]]; then
+  echo ""
+  echo "=== Authenticating with ECR ==="
+  "$real_aws" ecr get-login-password --region "$REGION" | \
+    docker login --username AWS --password-stdin "$ECR_URL"
+
+  echo ""
+  echo "=== Pushing Image ==="
+  docker push "$FULL_IMAGE"
+
+  echo ""
+  echo "=== Success ==="
+  echo "  Image pushed: $FULL_IMAGE"
+  echo ""
+  echo "  To deploy, update your Terraform or run:"
+  echo "    kubectl set image deployment/react2shell react2shell=$FULL_IMAGE -n react2shell"
+else
+  echo ""
+  echo "=== Build Complete ==="
+  echo "  Local image: $ECR_REPO:$TAG"
+  echo ""
+  echo "  To push to ECR, run:"
+  echo "    mise run build-image --push"
+fi
+

@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+#MISE description="Bootstraps the backend state infrastructure"
+#MISE dir="infrastructure/backends"
+
+#USAGE flag "--directories <dirs>" help="Comma-separated list of directories to run init-backends in"
+#USAGE flag "--branch <branch>" help="Branch to use for the environment"
+
+set -eo pipefail
+
+# Get repository root (works regardless of current directory)
+GIT_ROOT=$(git rev-parse --show-toplevel)
+BACKEND_CONFIG="$GIT_ROOT/infrastructure/backend-config.json"
+
+is_ci() {
+  [[ "${GITHUB_ACTIONS:-}" == "true" || "${CI:-}" == "true" ]]
+}
+
+# Determine environment from branch
+if [ -n "${usage_branch:-}" ]; then
+  BRANCH="$usage_branch"
+else
+  BRANCH=$(git rev-parse --abbrev-ref HEAD)
+fi
+
+if [[ "${BRANCH}" == "main" ]]; then
+  TF_VAR_environment="prod"
+elif [[ "${BRANCH}" == "staging" ]]; then
+  TF_VAR_environment="staging"
+else
+  BRANCH=$(echo "$BRANCH" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+  TF_VAR_environment="dev"
+fi
+
+# Check for valid AWS credentials (supports env vars, profiles, SSO, IMDS)
+if ! aws sts get-caller-identity &>/dev/null; then
+  echo "[Error]: Invalid or Missing AWS Credentials." >&2
+  echo "  Supported methods: AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, AWS_PROFILE, SSO, IMDS" >&2
+  echo "  For 1Password: eval \"\$(mise run auth)\"" >&2
+  exit 1
+fi
+
+echo "[INFO]: Working with environment: ${TF_VAR_environment}"
+echo "[INFO]: Branch: ${BRANCH}"
+
+export TF_VAR_environment BRANCH
+SSM_PARAM_NAME="/demo/terraform/backend/$BRANCH/config"
+
+if ! is_ci; then
+  echo "[INFO]: Runtime Environment: Local Machine"
+else
+  echo "[INFO]: Runtime Environment: Pipeline"
+fi
+
+# Check SSM for existing backend config
+if aws ssm get-parameter --name "$SSM_PARAM_NAME" &>/dev/null; then
+  echo ""
+  echo "[INFO]: Found existing backend configuration in Parameter Store"
+  aws ssm get-parameter --name "$SSM_PARAM_NAME" --query 'Parameter.Value' --output text > "$BACKEND_CONFIG"
+
+  # Extract values for display
+  BUCKET=$(jq -r '.state.bucket' "$BACKEND_CONFIG")
+  REGION=$(jq -r '.state.region' "$BACKEND_CONFIG")
+
+  echo "[INFO]: Using existing backend:"
+  echo "  Bucket: $BUCKET"
+  echo "  Region: $REGION"
+else
+  echo ""
+  echo "[WARN]: No existing backend configuration found for $SSM_PARAM_NAME"
+  echo "[INFO]: Creating new backend resources..."
+
+  if ! is_ci && { [[ "$BRANCH" == "main" ]] || [[ "$BRANCH" == "staging" ]]; }; then
+    echo "[WARN]: Sleeping 10 seconds for main/staging - hit CTRL-C to cancel"
+    sleep 10
+  else
+    sleep 2
+  fi
+
+  # Clean and initialize terraform
+  rm -rf .terraform .terraform.lock.hcl
+  terraform init -reconfigure
+  TF_VAR_branch=$BRANCH terraform apply -auto-approve
+
+  # Get outputs and create backend config
+  BUCKET=$(terraform output -raw state_bucket_name)
+  REGION="${AWS_REGION:-ap-southeast-2}"
+  SUFFIX=$(openssl rand -hex 3)
+
+  # Create backend-config.json with canonical 'suffix' field
+  cat > "$BACKEND_CONFIG" <<EOF
+{
+  "state": {
+    "bucket": "$BUCKET",
+    "region": "$REGION"
+  },
+  "environment": "$TF_VAR_environment",
+  "branch": "$BRANCH",
+  "suffix": "$SUFFIX"
+}
+EOF
+
+  # Store config in SSM
+  aws ssm put-parameter \
+    --name "$SSM_PARAM_NAME" \
+    --type "String" \
+    --value "$(cat "$BACKEND_CONFIG")" \
+    --overwrite
+
+  echo "[INFO]: Stored backend configuration in Parameter Store at $SSM_PARAM_NAME"
+fi
+
+# Read back values for summary
+BUCKET=$(jq -r '.state.bucket' "$BACKEND_CONFIG")
+REGION=$(jq -r '.state.region' "$BACKEND_CONFIG")
+SUFFIX=$(jq -r '.suffix' "$BACKEND_CONFIG")
+
+echo ""
+echo "Backend configuration complete:"
+echo "  Environment: $TF_VAR_environment"
+echo "  Bucket: $BUCKET"
+echo "  Region: $REGION"
+echo "  Suffix: $SUFFIX"
+echo ""
+
+# Run reset-backends and init-backends if available
+echo "[INFO]: Running reset-backends and init-backends..."
+
+if mise tasks | grep -q reset-backends; then
+  mise run reset-backends
+fi
+
+if [ -n "${usage_directories:-}" ]; then
+  echo "[INFO]: Initializing backends for directories: $usage_directories"
+  if mise tasks | grep -q init-backends; then
+    mise run init-backends --directories "$usage_directories"
+  fi
+else
+  echo "[INFO]: Initializing backends for all directories"
+  if mise tasks | grep -q init-backends; then
+    mise run init-backends
+  fi
+fi
+
+echo "[INFO]: Bootstrap complete!"
+
