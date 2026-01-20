@@ -1,77 +1,335 @@
 #!/usr/bin/env bash
-#MISE description="Apply Terraform configurations"
+#MISE description="Applies all terraform directories, except for the initial state bucket code"
 
 #USAGE flag "--wiz-tenants" help="Applies the infrastructure for wiz-tenants to demo"
 #USAGE flag "--shared-resources" help="Applies the shared resources folders"
-#USAGE flag "--all-scenarios" help="Applies all scenarios"
-#USAGE flag "--path <path>" help="Specific path to apply (e.g., scenarios/react2shell/aws)"
-#USAGE flag "--plan" help="Run terraform plan instead of apply"
-#USAGE flag "--all" help="Apply all infrastructure and scenarios in order"
+#USAGE flag "--all-scenarios" help="Applies the demo to all scenarios"
+#USAGE flag "--path <path>" help="Runs this file against a specific path or subpaths. Usage: --path scenarios/react2shell/aws"
+#USAGE flag "--plan" help="Plans the demo scenarios to determine if plans succeed"
+#USAGE flag "--summarize" help="When used with --plan, will provide a summary of changes"
 
 set -eo pipefail
 
-ACTION="apply -auto-approve"
-if [ "${usage_plan:-}" = "true" ]; then
-  ACTION="plan"
+OPERATION_MODE="apply"
+TARGET=""
+
+# shellcheck disable=SC2154
+if [ "$usage_plan" = "true" ]; then
+  if [ "$usage_summarize" = "true" ]; then
+    echo "Summarizing plan changes"
+    OPERATION_MODE="plan-summarize"
+  else
+    OPERATION_MODE="plan"
+  fi
 fi
 
-# Single path mode
-if [ -n "${usage_path:-}" ]; then
-  FULL_PATH="$GIT_ROOT/$usage_path"
-  if [ ! -d "$FULL_PATH" ]; then
-    echo "[ERROR]: Directory not found: $FULL_PATH"
+# shellcheck disable=SC2154
+if [ "$usage_summarize" = "true" ]; then
+  if [ "$usage_plan" != "true" ]; then
+    echo "Summarize flag only works with plan"
     exit 1
   fi
-  echo "[INFO]: Running terraform $ACTION in $usage_path"
-  cd "$FULL_PATH"
-  terraform $ACTION
-  exit 0
 fi
 
-# Determine directories to process
+# shellcheck disable=SC2154
+if [ "$usage_wiz_tenants" = "true" ]; then
+  TARGET="tenants"
+elif [ "$usage_all_scenarios" = "true" ]; then
+  TARGET="scenarios"
+elif [ -n "$usage_path" ]; then
+  TARGET="$usage_path"
+elif [ -n "$usage_shared_resources" ]; then
+  TARGET="shared_resources"
+else
+  TARGET="all"
+fi
+
 directories=()
+if [ -n "$usage_path" ]; then
+  directories+=("$TARGET")
+else
+  if [ "$TARGET" = "scenarios" ]; then
+    directories+=("scenarios")
 
-if [ "${usage_shared_resources:-}" = "true" ]; then
-  directories+=("infrastructure/shared/aws")
-elif [ "${usage_wiz_tenants:-}" = "true" ]; then
-  directories+=("infrastructure/wiz/develop")
-elif [ "${usage_all_scenarios:-}" = "true" ]; then
-  directories+=("scenarios")
-elif [ "${usage_all:-}" = "true" ]; then
-  # Full deployment order: shared -> wiz -> scenarios
-  directories+=("infrastructure/shared/aws" "infrastructure/wiz/develop" "scenarios")
+  elif [ "$TARGET" = "tenants" ]; then
+    directories+=("infrastructure/wiz")
+
+  elif [ "$TARGET" = "shared_resources" ]; then
+    directories+=("infrastructure/shared/aws")
+
+  elif [ "$TARGET" = "all" ]; then
+    directories+=("infrastructure/shared/aws" "infrastructure/wiz" "scenarios")
+  fi
 fi
 
-if [ ${#directories[@]} -eq 0 ]; then
-  echo "[INFO]: No directories specified. Use --all, --shared-resources, --wiz-tenants, --all-scenarios, or --path"
+execute_terraform_parallel() {
+  local max_jobs=5
+  local pids=()
+  local dirs_to_process=("$@")
+  local pid_dirs=()
+  echo "🚀 Starting parallel terraform execution with up to $max_jobs jobs..."
+
+  for dir in "${dirs_to_process[@]}"; do
+    while [[ ${#pids[@]} -ge $max_jobs ]]; do
+      echo "⏳ Max jobs ($max_jobs) running, waiting for completion..."
+
+      wait -n
+
+      # Remove completed jobs from pids array
+      local new_pids=()
+      for pid in "${pids[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+          new_pids+=("$pid")
+        fi
+      done
+      pids=("${new_pids[@]}")
+
+      echo "📊 Jobs remaining: ${#pids[@]}"
+    done
+
+    echo "🚀 Starting terraform for $dir..."
+    (
+      full_path="$GIT_ROOT/$dir"
+      process_directory "$full_path" "$dir"
+    ) &
+
+    local job_pid=$!
+    pids+=("$job_pid")
+    pid_dirs+=("$dir")
+    echo "✅ Started terraform for $dir (PID: $job_pid, ${#pids[@]}/$max_jobs active)"
+    sleep 1
+  done
+
+  echo "⏳ Waiting for all remaining jobs to complete..."
+  local failed_jobs=0
+  for i in "${!pids[@]}"; do
+    local pid="${pids[$i]}"
+    local dir="${pid_dirs[$i]}"
+    echo "⏳ Waiting for PID $pid ($dir)..."
+    if ! wait "$pid"; then
+      echo "❌ PID $pid ($dir) failed"
+      FAILED_DIRECTORIES+=("$dir")
+      ((failed_jobs++))
+      ((CAPTURED_ERRORS++))
+    else
+      echo "✅ PID $pid ($dir) completed successfully"
+    fi
+  done
+
+  if [[ $failed_jobs -gt 0 ]]; then
+    echo "❌ $failed_jobs parallel jobs failed"
+  fi
+  echo "🚀 All parallel jobs completed"
+}
+
+capture_failure() {
+  local rel_path="${1#"$GIT_ROOT/"}"
+  CAPTURED_ERRORS=$((CAPTURED_ERRORS + 1))
+  FAILED_DIRECTORIES+=("$rel_path")
+  return 1
+}
+
+summarize_plan() {
+  local dir="$1"
+  CREATE=$(jq -r '[.resource_changes[] | select(.change.actions[] == "create" and (.type != "data"))]' tfplan.json)
+  UPDATE=$(jq -r '[.resource_changes[] | select(.change.actions[] == "update" and (.type != "data"))]' tfplan.json)
+  DESTROY=$(jq -r '[.resource_changes[] | select(.change.actions[] == "delete" and (.type != "data"))]' tfplan.json)
+  REPLACE=$(jq -r '[.resource_changes[] | select(.change.actions[] == "replace" and (.type != "data"))]' tfplan.json)
+
+  CREATE_COUNT=$(echo "$CREATE" | jq -r '.[]' | jq -s 'length')
+  UPDATE_COUNT=$(echo "$UPDATE" | jq -r '.[]' | jq -s 'length')
+  DESTROY_COUNT=$(echo "$DESTROY" | jq -r '.[]' | jq -s 'length')
+  REPLACE_COUNT=$(echo "$REPLACE" | jq -r '.[]' | jq -s 'length')
+
+  echo "===== Plan Summary for $dir ====="
+  echo "Resources to create:  $CREATE_COUNT"
+  echo "Resources to update:  $UPDATE_COUNT"
+  echo "Resources to delete:  $DESTROY_COUNT"
+  echo "Resources to replace: $REPLACE_COUNT"
+  echo " "
+  echo "=====Resources being created:====="
+  if [ "$CREATE_COUNT" -gt 0 ]; then
+    echo "$CREATE" | jq -r '.[] | if .address then (.address) else empty end'
+  else
+    echo "No resources to create"
+  fi
+
+  echo " "
+  echo "=====Resources being updated:======"
+  if [ "$UPDATE_COUNT" -gt 0 ]; then
+    echo "$UPDATE" | jq -r '.[] |
+      (.change.before // {}) as $before |
+      (.change.after // {}) as $after |
+      (.change.before_sensitive // {}) as $before_sensitive |
+      (.change.after_sensitive // {}) as $after_sensitive |
+      ($after | keys) as $keys |
+      "Resource: \(.address)\n" +
+      "Changes:" +
+      ($keys | map(
+        . as $key |
+        if ($before[$key] != $after[$key]) or
+           ($before_sensitive[$key] != $after_sensitive[$key]) then
+          "\n  ~ " + $key + ":" +
+          "\n    - " + (
+            if $before_sensitive[$key] == true then
+              "(sensitive value)"
+            elif $before_sensitive[$key] != null and ($before_sensitive[$key] | type) == "array" and (($before_sensitive[$key] | any) == true) then
+              "(array with sensitive values)"
+            elif $before_sensitive[$key] != null and ($before_sensitive[$key] | type) == "object" then
+              "(object with sensitive values)"
+            else
+              ($before[$key] | tostring)
+            end
+          ) +
+          "\n    + " + (
+            if $after_sensitive[$key] == true then
+              "(sensitive value)"
+            elif $after_sensitive[$key] != null and ($after_sensitive[$key] | type) == "array" and (($after_sensitive[$key] | any) == true) then
+              "(array with sensitive values)"
+            elif $after_sensitive[$key] != null and ($after_sensitive[$key] | type) == "object" then
+              "(object with sensitive values)"
+            else
+              ($after[$key] | tostring)
+            end
+          )
+        else
+          empty
+        end
+      ) | join(""))'
+  else
+    echo "No resources to update"
+  fi
+
+  echo " "
+  echo "=====Resources being destroyed:====="
+  if [ "$DESTROY_COUNT" -gt 0 ]; then
+    echo "$DESTROY" | jq -r '.[] | if .address then (.address) else empty end'
+  else
+    echo "No resources to destroy"
+  fi
+
+  echo " "
+  echo "=====Resources being replaced:====="
+  if [ "$REPLACE_COUNT" -gt 0 ]; then
+    echo "$REPLACE" | jq -r '.[] | if .address then (.address) else empty end'
+  else
+    echo "No resources to replace"
+  fi
+
+  echo "=================================="
+}
+
+if [ ! -f "$CONFIG_PATH" ]; then
+  echo "Backend config not found at: $CONFIG_PATH"
+  echo "Run bootstrap-branch first."
   exit 1
 fi
 
+CAPTURED_ERRORS=0
+FAILED_DIRECTORIES=()
+
 process_directory() {
   local dir="$1"
-
-  if [[ -n $(find "$dir" -maxdepth 1 -name "*.tf" 2>/dev/null) ]]; then
+  local base_prefix="${2:-}"
+  if [[ -n $(find "$dir" -maxdepth 1 -name "*.tf") ]]; then
     if [[ -f "$dir/backend.tf" ]]; then
       local rel_path="${dir#"$GIT_ROOT/"}"
-      echo "[INFO]: Running terraform $ACTION in $rel_path"
-      cd "$dir"
-      terraform $ACTION
-      cd "$GIT_ROOT"
-    fi
-  fi
+      if [[ -n $base_prefix ]]; then
+        echo "[$rel_path] Processing: $rel_path"
+      fi
 
-  # Process subdirectories
-  for subdir in "$dir"/*; do
-    if [[ -d $subdir ]] && [[ ! $subdir == *"/modules"* ]]; then
-      process_directory "$subdir"
+      local should_apply_or_plan=true
+
+      # Handle Wiz tenant credentials - simplified for this repo
+      if [[ $dir == */infrastructure/wiz/* ]]; then
+        echo "[$rel_path] Using Development Environment Credentials"
+        if [[ -n $WIZ_CLIENT_ID && -n $WIZ_CLIENT_SECRET ]]; then
+          echo "[$rel_path] Using WIZ_CLIENT_ID and WIZ_CLIENT_SECRET"
+        else
+          echo "[$rel_path] Credentials not available. WIZ_CLIENT_ID and WIZ_CLIENT_SECRET must be set"
+          should_apply_or_plan=false
+        fi
+      fi
+
+      if [[ $should_apply_or_plan == "true" ]]; then
+        cd "$dir" || exit 1
+        case "$OPERATION_MODE" in
+        "plan")
+          echo "[$rel_path] Planning terraform in $dir"
+          if ! eval "terraform plan"; then
+            capture_failure "$dir"
+            exit 1
+          fi
+          ;;
+        "plan-summarize")
+          echo "[$rel_path] Planning terraform in $dir"
+          if ! eval "terraform plan -out=tfplan >planoutput.log 2>&1"; then
+            echo "[$rel_path] Generating output log"
+            cat planoutput.log
+            capture_failure "$dir"
+            exit 1
+          elif ! eval "terraform show -json tfplan >tfplan.json 2>&1"; then
+            echo "[$rel_path] Converting plan to json"
+            capture_failure "$dir"
+            exit 1
+          else
+            echo "[$rel_path] Terraform plan succeeded in $dir"
+            echo "[$rel_path] Summarizing plan changes for $dir..."
+            summarize_plan "$dir"
+            rm -f tfplan tfplan.json planoutput.log
+          fi
+          ;;
+        "apply")
+          echo "[$rel_path] Applying terraform in $dir"
+          if ! eval "terraform apply -auto-approve 2>&1"; then
+            echo "[$rel_path] Apply failed, will retry after 5 seconds"
+            sleep 5
+
+            if ! eval "terraform apply -auto-approve 2>&1"; then
+              echo "[$rel_path] [ERROR]: Retry failed"
+              capture_failure "$dir"
+              exit 1
+            fi
+          else
+            echo "[$rel_path] Terraform apply succeeded in $dir"
+          fi
+          ;;
+        esac
+        cd "$GIT_ROOT"
+      fi
+    else
+      echo "[$rel_path] Skipping directory $dir - no backend.tf found"
     fi
-  done
+  else
+    for subdir in "$dir"/*; do
+      if [[ -d $subdir ]]; then
+        process_directory "$subdir" "$base_prefix"
+      fi
+    done
+  fi
 }
 
-for base_dir in "${directories[@]}"; do
-  full_path="$GIT_ROOT/$base_dir"
-  echo "[INFO]: Processing $base_dir..."
-  process_directory "$full_path"
-done
+if [[ $OPERATION_MODE == "plan"* ]]; then
+  echo "Using parallel processing for plan operations"
+  execute_terraform_parallel "${directories[@]}"
+elif [[ $OPERATION_MODE == "apply" && ${directories[*]} == *"scenarios"* && ${#directories[@]} -eq 1 ]]; then
+  echo "Using parallel processing for scenarios apply"
+  execute_terraform_parallel "${directories[@]}"
+else
+  echo "Using sequential processing"
+  for base_dir in "${directories[@]}"; do
+    full_path="$GIT_ROOT/$base_dir"
+    echo "Processing directory: $full_path"
+    process_directory "$full_path" "$base_dir"
+  done
+fi
 
-echo "[INFO]: Apply complete!"
+if [ "$CAPTURED_ERRORS" -gt 0 ]; then
+  echo "=========================================================================="
+  echo "FAILURE: $CAPTURED_ERRORS scenario directories failed during plan or apply"
+  echo "Failed scenarios:"
+  for failed_dir in "${FAILED_DIRECTORIES[@]}"; do
+    echo "  - $failed_dir"
+  done
+  exit 1
+fi
