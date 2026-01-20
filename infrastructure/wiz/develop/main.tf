@@ -118,7 +118,7 @@ module "wiz_aws_connector" {
       region             = try(data.terraform_remote_state.shared_resources.outputs.cloudtrail_bucket_region, null)
       override_queue_url = try(data.terraform_remote_state.shared_resources.outputs.wiz_events_object_map[local.tenant_short_name].sqs_queue_url, null)
     }
-  } : {}
+  } : null
 
   # VPC Flow Logs configuration for Wiz Defend
   vpc_flow_log_config = local.vpc_flow_log_bucket != null ? {
@@ -127,7 +127,7 @@ module "wiz_aws_connector" {
       region             = try(data.terraform_remote_state.shared_resources.outputs.vpc_flow_logs_bucket_region, null)
       override_queue_url = try(data.terraform_remote_state.shared_resources.outputs.vpc_flow_logs_object_map[local.tenant_short_name].sqs_queue_url, null)
     }
-  } : {}
+  } : null
 
   # Route53 DNS Query Logs configuration for Wiz Defend
   resolver_query_logs_config = local.route53_logs_bucket != null ? {
@@ -136,5 +136,5 @@ module "wiz_aws_connector" {
       region             = try(data.terraform_remote_state.shared_resources.outputs.route53_logs_bucket_region, null)
       override_queue_url = try(data.terraform_remote_state.shared_resources.outputs.route53_logs_sqs_queue_urls[local.tenant_short_name], null)
     }
-  } : {}
+  } : null
 }
