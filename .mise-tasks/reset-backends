@@ -1,14 +1,37 @@
 #!/usr/bin/env bash
-#MISE description="Removes all backend.tf files from non-module directories"
+#MISE description="Resets backends across all folders.  Used as a standalone call or with bootstrap-backend to reset branch backend.tf files"
+#MISE hide=true
 
 set -eo pipefail
 
-echo "[INFO]: Resetting all backend.tf files..."
+directories=(
+  "infrastructure/shared"
+  "infrastructure/wiz"
+  "scenarios"
+)
 
-# Find and remove all backend.tf and backend.hcl files, excluding modules
-find "$GIT_ROOT" -type f \( -name "backend.tf" -o -name "backend.hcl" \) \
-  -not -path "*/modules/*" \
-  -not -path "*/.terraform/*" \
-  -exec rm -v {} \;
+process_directory() {
+  local dir="$1"
+  if [[ $dir == *"/modules/"* ]]; then
+    return
+  fi
 
-echo "[INFO]: Backend reset complete."
+  if [[ -n $(find "$dir" -maxdepth 1 -name "*.tf") ]]; then
+    if [[ -f "$dir/backend.hcl" ]]; then
+      echo "[INFO]: Found backend config in $dir.  Removing"
+      rm "$dir/backend.hcl"
+    fi
+
+  else
+    for subdir in "$dir"/*; do
+      if [[ -d $subdir ]]; then
+        process_directory "$subdir"
+      fi
+    done
+  fi
+}
+
+for base_dir in "${directories[@]}"; do
+  full_path="$GIT_ROOT/$base_dir"
+  process_directory "$full_path"
+done

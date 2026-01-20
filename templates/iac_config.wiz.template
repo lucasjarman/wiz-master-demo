@@ -1,0 +1,6 @@
+terraform:
+  dynamicBackends:
+    staging:
+      bucket: "demo-staging-f3169f-state-bucket-us-east-2"
+    prod:
+      bucket: "demo-prod-68c252-state-bucket-us-east-2"

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #MISE description="Initialize Terraform directories with environment-specific backend"
 
-#USAGE flag "--force-recreate" help="Removes .terraform directories and reinitializes"
-#USAGE flag "--config-path <config-path>" help="Path to backend-config.json"
-#USAGE flag "--directories <dirs>" help="Comma-separated list of directories to init"
+#USAGE flag "--force-recreate" help="Removes .terraform directories and reinitializes the backend configuration"
+#USAGE flag "--config-path <config-path>" help="Provide the path to the backend-config.json file"
+#USAGE flag "--directories <dirs>" help="Comma-separated list of directories to run init-backends  in"
+#USAGE flag "--parallel" help="Execute backend initialization in parallel"
 
 set -eo pipefail
 
@@ -15,22 +16,20 @@ if [ "$usage_force_recreate" = "true" ]; then
   FORCE_RECREATE=true
 fi
 
-# Determine config path
 if [ -n "${usage_config_path:-}" ]; then
   CONFIG_PATH=$usage_config_path
   echo "Using provided path $CONFIG_PATH"
-elif [ -z "${CONFIG_PATH:-}" ]; then
-  echo "No config path provided and CONFIG_PATH not set"
-  exit 1
+else
+  echo "No config path provided, attempting to find backend-config.json"
+
+  if [ ! -f "$CONFIG_PATH" ]; then
+    echo "Backend config not found at: $CONFIG_PATH"
+    echo "Run tf-bootstrap-backend first."
+    exit 1
+  fi
+  echo "Found backend config at $CONFIG_PATH"
 fi
 
-if [ ! -f "$CONFIG_PATH" ]; then
-  echo "Backend config not found at: $CONFIG_PATH"
-  echo "Run tf-bootstrap-backend first."
-  exit 1
-fi
-
-# Determine directories to process
 if [ -n "${usage_directories:-}" ]; then
   IFS=',' read -ra directories <<<"$usage_directories"
   echo "Using custom directories: ${directories[*]}"
@@ -43,16 +42,74 @@ else
   )
 fi
 
-# Get backend configuration
-BUCKET=$(jq -r '.state.bucket' "$CONFIG_PATH")
-REGION=$(jq -r '.state.region' "$CONFIG_PATH")
-
-if [ -z "$BUCKET" ] || [ "$BUCKET" = "null" ]; then
-  echo "No bucket found in backend configuration"
+# Get backend configuration for the environment
+BACKEND_CONFIG=$(jq .state "$CONFIG_PATH")
+if [ "$BACKEND_CONFIG" = "null" ]; then
+  echo "No backend configuration found for state"
   exit 1
 fi
 
-echo "Using bucket: $BUCKET, region: $REGION"
+BUCKET=$(jq -r '.state.bucket' "$CONFIG_PATH")
+REGION=$(jq -r '.state.region' "$CONFIG_PATH")
+
+execute_init_serial() {
+  echo "🚀 Starting serial backend initialization..."
+
+  for dir in "${directories[@]}"; do
+    full_path="$GIT_ROOT/$dir"
+    echo "🚀 Processing $dir..."
+    process_directory "$full_path"
+    echo "✅ Completed backend init for $dir"
+  done
+
+  echo "All serial backend initialization jobs completed!"
+}
+
+execute_init_parallel() {
+  local max_jobs=5
+  local pids=()
+
+  echo "🚀 Starting parallel backend initialization with up to $max_jobs jobs..."
+
+  for dir in "${directories[@]}"; do
+    while [[ ${#pids[@]} -ge $max_jobs ]]; do
+      echo "⏳ Max jobs ($max_jobs) running, waiting for completion..."
+
+      wait
+
+      local new_pids=()
+      for pid in "${pids[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+          new_pids+=("$pid")
+        fi
+      done
+      pids=("${new_pids[@]}")
+
+      echo "📊 Jobs remaining: ${#pids[@]}"
+    done
+
+    # Start new job
+    echo "🚀 Starting backend init for $dir..."
+    (
+      full_path="$GIT_ROOT/$dir"
+      process_directory "$full_path" 2>&1 | awk -v prefix="[$dir]" '{print prefix " " $0}'
+    ) &
+
+    pids+=($!)
+    echo "✅ Started backend init for $dir (PID: $!, ${#pids[@]}/$max_jobs active)"
+
+    sleep 1
+  done
+
+  echo "⏳ Waiting for all remaining jobs to complete..."
+  for pid in "${pids[@]}"; do
+    echo "⏳ Waiting for PID $pid..."
+    wait "$pid"
+    echo "✅ PID $pid completed"
+  done
+
+  echo "All parallel backend initialization jobs completed!"
+}
 
 process_directory() {
   local dir="$1"
@@ -63,64 +120,98 @@ process_directory() {
     return
   fi
 
-  # Skip module directories
-  if [[ $dir == *"/modules/"* ]] || [[ $dir == *"/modules" ]]; then
+  if [[ $dir == *"/modules/"* ]]; then
     echo "Skipping modules directory: $dir"
     return
   fi
 
-  # Process if directory contains .tf files
-  if [[ -n $(find "$dir" -maxdepth 1 -name "*.tf" 2>/dev/null) ]]; then
-    echo "Processing $dir..."
+  if [[ -n $(find "$dir" -maxdepth 1 -name "*.tf") ]]; then
+    local backend_exists=false
+    local backend_changed=false
+    if [[ -f "$dir/backend.tf" ]]; then
+      backend_exists=true
 
-    local rel_path
-    rel_path=$(python3 -c "import os.path; print(os.path.relpath('$dir', '$GIT_ROOT'))")
+      if ! grep -q "${BUCKET}" "$dir/backend.tf"; then
+        backend_changed=true
+        echo "Backend bucket has changed in $dir"
+      fi
 
-    # Create backend.tf
-    cat >"$dir/backend.tf" <<EOF
+    fi
+
+    local should_update=false
+
+    if [[ $FORCE_RECREATE == "true" ]]; then
+      should_update=true
+    elif [[ $backend_exists == "false" ]]; then
+      should_update=true
+    elif [[ $backend_changed == "true" ]]; then
+      should_update=true
+    fi
+
+    if [[ $should_update == "true" ]]; then
+      echo "Creating backend.tf in $dir"
+
+      local rel_path
+      rel_path=$(python3 -c "import os.path; print(os.path.relpath('$dir', '$GIT_ROOT'))")
+      STATE_PATH="$rel_path"
+
+      cat >"$dir/backend.tf" <<EOF
 terraform {
   backend "s3" {
-    encrypt      = true
-    use_lockfile = true
+  encrypt = true
+  use_lockfile = true
   }
 }
 EOF
 
-    # Create backend.hcl
-    cat >"$dir/backend.hcl" <<EOF
+      cat >"$dir/backend.hcl" <<EOF
 bucket = "${BUCKET}"
-key    = "${rel_path}/terraform.tfstate"
+key    = "${STATE_PATH}/terraform.tfstate"
 region = "${REGION}"
 EOF
+      echo "State file will be stored at: ${STATE_PATH}/terraform.tfstate"
+      cd "$dir"
+      if [[ $FORCE_RECREATE == "true" ]] || [[ $backend_changed == "true" ]]; then
+        echo "Cleaning .terraform directory for a fresh start"
+        rm -rf "$dir/.terraform" "$dir/.terraform.lock.hcl"
+      fi
+      terraform init -reconfigure
+      cd "$GIT_ROOT"
 
-    echo "Created backend files for $dir (state key: ${rel_path}/terraform.tfstate)"
-
-    # Run terraform init
-    cd "$dir"
-    if [[ $FORCE_RECREATE == "true" ]]; then
-      echo "Cleaning .terraform directory for fresh start"
-      rm -rf .terraform .terraform.lock.hcl
+    elif [[ $backend_exists == "true" && ! -f "$dir/backend.hcl" ]]; then
+      echo "Building backend.hcl for backend.tf"
+      cat >"$dir/backend.hcl" <<EOF
+bucket = "${BUCKET}"
+key    = "${STATE_PATH}/terraform.tfstate"
+region = "${REGION}"
+EOF
+      echo "Running terraform init in $dir"
+      cd "$dir"
+      terraform init
+      cd "$GIT_ROOT"
+    else
+      echo "Running terraform init in $dir"
+      cd "$dir"
+      terraform init
+      cd "$GIT_ROOT"
     fi
-    terraform init -reconfigure -backend-config=backend.hcl
-    cd "$GIT_ROOT"
-
-    echo "✅ Completed backend init for $dir"
   fi
 
-  # Recurse into subdirectories
   for subdir in "$dir"/*; do
     if [[ -d $subdir ]]; then
-      process_directory "$subdir"
+      if [[ $subdir == *"/modules/"* ]] || [[ $subdir == *"/custom_controls/"* ]]; then
+        echo "Skipping module directory $subdir"
+      else
+        echo "Processing subdirectory $subdir"
+        process_directory "$subdir"
+      fi
     fi
   done
 }
 
-echo "🚀 Starting backend initialization..."
-
-for dir in "${directories[@]}"; do
-  full_path="$GIT_ROOT/$dir"
-  echo "📁 Processing $dir..."
-  process_directory "$full_path"
-done
-
-echo "✅ All backend initialization completed!"
+# shellcheck disable=SC2154
+if [ "$usage_parallel" = "true" ]; then
+  execute_init_parallel
+else
+  execute_init_serial
+fi

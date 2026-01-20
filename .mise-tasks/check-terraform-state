@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+#MISE description="Lists all Terraform state across all directories to check for existing infrastructure"
+
+#USAGE flag "--path <path>" help="Runs this file against a specific path or subpaths. Usage is as follows `--path scenario1/aws`"
+
+set -eo pipefail
+
+directories=()
+if [ -n "$usage_path" ]; then
+  directories+=("$usage_path")
+else
+  directories+=("scenarios" "infrastructure/wiz" "infrastructure/shared" "infrastructure/backends")
+fi
+
+if [ ! -f "$CONFIG_PATH" ]; then
+  echo "Backend config not found at: $CONFIG_PATH"
+  echo "Run tf-bootstrap-backend first."
+  exit 1
+fi
+
+ENVIRONMENT=$(jq -r '.environment' "$CONFIG_PATH")
+CONFIG_BRANCH=$(jq -r '.branch' "$CONFIG_PATH")
+GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+export TF_VAR_environment=$ENVIRONMENT
+export TF_VAR_branch=$CONFIG_BRANCH
+
+TOTAL_RESOURCES=0
+DIRECTORIES_WITH_STATE=0
+TOTAL_DIRECTORIES=0
+
+echo "=== Terraform State Check ==="
+echo "Environment: $ENVIRONMENT"
+echo "Config Branch: $CONFIG_BRANCH"
+echo "Git Branch: $GIT_BRANCH"
+echo "============================="
+
+process_directory() {
+  local dir="$1"
+  local rel_path="${dir#"$GIT_ROOT/"}"
+
+  if [[ -n $(find "$dir" -maxdepth 1 -name "*.tf") ]]; then
+    if [[ -f "$dir/backend.tf" ]]; then
+      TOTAL_DIRECTORIES=$((TOTAL_DIRECTORIES + 1))
+      cd "$dir" || return 1
+
+      # Try to get state list and capture exit code
+      local exit_code=0
+      local state_output
+      state_output=$(terraform state list 2>&1) || exit_code=$?
+
+      if [[ $exit_code -eq 0 ]]; then
+        if [[ -n $state_output ]]; then
+          resource_count=$(echo "$state_output" | wc -l)
+          echo "📦 $rel_path ($resource_count resources)"
+          if [[ $resource_count -le 10 ]]; then
+            echo "$state_output" | while IFS= read -r line; do
+              echo "  ├─ $line"
+            done
+          else
+            echo "  └─ (Too many resources to list individually)"
+          fi
+          echo
+          TOTAL_RESOURCES=$((TOTAL_RESOURCES + resource_count))
+          DIRECTORIES_WITH_STATE=$((DIRECTORIES_WITH_STATE + 1))
+        else
+          echo "📭 $rel_path (no resources)"
+        fi
+      else
+        # Check if it's the "No state file was found" error
+        if [[ $state_output == *"No state file was found!"* ]]; then
+          echo "📭 $rel_path (no state file - no resources)"
+        else
+          echo "⚠️  $rel_path (failed to check state)"
+          echo "Error output:"
+          echo "$state_output" | while IFS= read -r line; do
+            echo "  │ $line"
+          done
+          echo
+        fi
+      fi
+
+      cd "$GIT_ROOT"
+    fi
+  fi
+}
+
+for base_dir in "${directories[@]}"; do
+  full_path="$GIT_ROOT/$base_dir"
+
+  if [[ $base_dir == "scenarios" ]]; then
+    for scenario_dir in "$full_path"/scenario*; do
+      if [[ -d $scenario_dir ]]; then
+        while IFS= read -r -d '' subdir; do
+          process_directory "$subdir"
+        done < <(find "$scenario_dir" -type d -print0 | sort -z)
+      fi
+    done
+  else
+    while IFS= read -r -d '' subdir; do
+      process_directory "$subdir"
+    done < <(find "$full_path" -type d -print0 | sort -z)
+  fi
+done
+
+echo "=== Summary ==="
+echo "Total directories checked: $TOTAL_DIRECTORIES"
+echo "Directories with state: $DIRECTORIES_WITH_STATE"
+echo "Directories empty: $((TOTAL_DIRECTORIES - DIRECTORIES_WITH_STATE))"
+echo "Total resources: $TOTAL_RESOURCES"
+
+if [[ $TOTAL_RESOURCES -gt 0 ]]; then
+  echo
+  echo "⚠️  WARNING: You have $TOTAL_RESOURCES resources across $DIRECTORIES_WITH_STATE directories."
+  echo "   Consider running 'mise run destroy-dev-environment' before switching branches."
+  exit 1
+else
+  echo
+  echo "✅ No resources found in Terraform state. Safe to switch branches."
+fi

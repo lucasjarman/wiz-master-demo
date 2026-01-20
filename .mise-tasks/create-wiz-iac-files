@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+#MISE description="Update iac_config.wiz files with terraform backend bucket information"
+#USAGE flag "--recreate" help="Recreate iac_config.wiz files even if they already exist"
+#USAGE flag "--directories <dirs>" help="Comma-separated list of directories (defaults to same as init-backends)"
+
+set -eo pipefail
+
+TEMPLATE_DIR="$GIT_ROOT/templates"
+TEMPLATE_FILE="$TEMPLATE_DIR/iac_config.wiz.template"
+RECREATE=false
+
+# shellcheck disable=SC2154
+if [ "$usage_recreate" = "true" ]; then
+  RECREATE="$usage_recreate"
+  echo "Recreating iac_config.wiz files"
+fi
+
+if [[ ! -f $TEMPLATE_FILE ]]; then
+  echo "Error: Template file not found at $TEMPLATE_FILE"
+  exit 1
+fi
+
+if [ -n "${usage_directories:-}" ]; then
+  IFS=',' read -ra directories <<<"$usage_directories"
+  echo "Using custom directories: ${directories[*]}"
+else
+  echo "No directories provided, using default directories"
+  directories=(
+    "infrastructure/shared/aws"
+    "infrastructure/wiz/develop"
+    "scenarios"
+  )
+fi
+
+update_template_regions() {
+  local state_path="$1"
+  while IFS= read -r line || [[ -n $line ]]; do
+    echo "$line"
+    if [[ $line == *"bucket:"* ]]; then
+      bucket=$(echo "$line" | sed -E 's/.*"([^"]+)".*/\1/')
+      region=$(echo "$bucket" | sed -E 's/.*bucket-(.+)$/\1/')
+      echo "      region: \"$region\""
+      echo "      key: \"$state_path/terraform.tfstate\""
+    fi
+  done <"$TEMPLATE_FILE"
+}
+
+copy_iac_config() {
+  local dir="$1"
+  local config_file="$dir/iac_config.wiz"
+  local rel_path
+  rel_path=$(python3 -c "import os.path; print(os.path.relpath('$dir', '$GIT_ROOT'))")
+  STATE_PATH="$rel_path"
+
+  if [[ ! -f $config_file || $RECREATE == "true" ]]; then
+    echo "Creating iac_config.wiz in $dir"
+    update_template_regions "$STATE_PATH" >"$config_file"
+
+  else
+    local template_with_regions
+    template_with_regions=$(update_template_regions "$STATE_PATH")
+
+    local template_hash
+    template_hash=$(echo "$template_with_regions" | sha256sum | cut -d' ' -f1)
+
+    local existing_hash
+    existing_hash=$(sha256sum "$config_file" | cut -d' ' -f1)
+
+    if [[ $template_hash != "$existing_hash" ]]; then
+      echo "iac_config.wiz in $dir differs from template, recreating"
+      echo "$template_with_regions" >"$config_file"
+      echo "Updated iac_config.wiz in $dir"
+    fi
+  fi
+}
+
+process_directory() {
+  local dir="$1"
+
+  if [[ ! -d $dir ]]; then
+    return
+  fi
+
+  if [[ $dir == *"/modules/"* ]]; then
+    return
+  fi
+
+  if [[ -f "$dir/backend.tf" ]]; then
+    echo "Found backend.tf in $dir, checking iac_config.wiz file"
+    copy_iac_config "$dir"
+  fi
+
+  for subdir in "$dir"/*; do
+    if [[ -d $subdir ]]; then
+      if [[ $subdir == *"/modules/"* ]] || [[ $subdir == *"/custom_controls/"* ]]; then
+        continue
+      else
+        process_directory "$subdir"
+      fi
+    fi
+  done
+}
+
+for base_dir in "${directories[@]}"; do
+  full_path="$GIT_ROOT/$base_dir"
+  process_directory "$full_path"
+done
+
+echo "✅ Copied iac_config.wiz template to directories with backend.tf"
