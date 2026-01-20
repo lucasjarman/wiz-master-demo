@@ -197,7 +197,7 @@ When set to `false`, you must provide the corresponding ARN variables:
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_prefix"></a> [prefix](#input\_prefix) | A string representing the prefix for all created resources | `string` | n/a | yes |
-| <a name="input_wiz_role_names"></a> [wiz\_role\_names](#input\_wiz\_role\_names) | Map of Wiz role prefixes to role names (e.g., {"adv" = "WizAccessRole", "ext" = "WizAccessRoleExternal"}) | `map(string)` | n/a | yes |
+| <a name="input_wiz_role_names"></a> [wiz\_role\_names](#input\_wiz\_role\_names) | Map of Wiz role prefixes to role names (e.g., {"adv" = "WizAccessRole", "ext" = "WizAccessRoleExternal"}). Can be empty if Wiz integration is not configured. | `map(string)` | `{}` | no |
 | <a name="input_bucket_encryption_enabled"></a> [bucket\_encryption\_enabled](#input\_bucket\_encryption\_enabled) | Whether to enable encryption on the S3 bucket | `bool` | `true` | no |
 | <a name="input_bucket_force_destroy"></a> [bucket\_force\_destroy](#input\_bucket\_force\_destroy) | Whether to allow force destroy of the S3 bucket | `bool` | `true` | no |
 | <a name="input_bucket_key_enabled"></a> [bucket\_key\_enabled](#input\_bucket\_key\_enabled) | Whether to enable S3 bucket key for SSE-KMS | `bool` | `true` | no |

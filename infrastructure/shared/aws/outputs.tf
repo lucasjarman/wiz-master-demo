@@ -120,6 +120,12 @@ output "flow_logs_bucket_name" {
   value       = try(module.aws_buckets[0].s3_buckets["flowLogs"].id, null)
 }
 
+# Alias for reference-repo compatibility (wiz-demo-infra uses vpc_flow_logs_bucket_name)
+output "vpc_flow_logs_bucket_name" {
+  description = "Name of the VPC Flow Logs S3 bucket (alias for flow_logs_bucket_name)"
+  value       = try(module.aws_buckets[0].s3_buckets["flowLogs"].id, null)
+}
+
 output "route53_logs_bucket_name" {
   description = "Name of the Route53 logs S3 bucket"
   value       = try(module.wiz_defend_logs[0].bucket_id, null)
