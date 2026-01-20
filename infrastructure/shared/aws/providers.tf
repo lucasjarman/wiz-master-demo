@@ -10,5 +10,27 @@ provider "aws" {
   }
 }
 
-# NOTE: Kubernetes and Helm providers have been moved to infrastructure/wiz/develop layer
-# They are configured via terraform_remote_state to read EKS cluster outputs from this layer.
+# Kubernetes and Helm providers for AWS Load Balancer Controller deployment
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", var.aws_region]
+  }
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", var.aws_region]
+    }
+  }
+}

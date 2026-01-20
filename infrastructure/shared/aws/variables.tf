@@ -57,6 +57,12 @@ variable "eks_node_instance_type" {
   default     = "t3.medium"
 }
 
+variable "aws_load_balancer_controller_version" {
+  description = "Version of the AWS Load Balancer Controller Helm chart"
+  type        = string
+  default     = "1.11.0"
+}
+
 # -----------------------------------------------------------------------------
 # Wiz Connector Variables
 # -----------------------------------------------------------------------------

@@ -16,6 +16,13 @@ terraform {
       source  = "hashicorp/time"
       version = "~> 0.9"
     }
-    # NOTE: kubernetes and helm providers have been moved to infrastructure/wiz/develop layer
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.0"
+    }
   }
 }

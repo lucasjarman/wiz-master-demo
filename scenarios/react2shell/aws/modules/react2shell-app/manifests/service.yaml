@@ -6,16 +6,17 @@ metadata:
   namespace: ${namespace}
   labels:
     app: ${name}
-  # Note: Using in-tree cloud provider (Classic ELB) since AWS Load Balancer Controller
-  # is not installed. For NLB support, install the AWS Load Balancer Controller and
-  # uncomment the annotations below:
-  # annotations:
-  #   service.beta.kubernetes.io/aws-load-balancer-type: "external"
-  #   service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
-  #   service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-  #   service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: preserve_client_ip.enabled=true
+  annotations:
+    # NLB for public exposure (Wiz sees "publicly exposed" in attack graph)
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    # Preserve client IP so NetworkPolicy can filter by source IP
+    service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: preserve_client_ip.enabled=true
 spec:
   type: LoadBalancer
+  # Local policy required to preserve client source IP for NetworkPolicy filtering
+  externalTrafficPolicy: Local
   selector:
     app: ${name}
   ports:
