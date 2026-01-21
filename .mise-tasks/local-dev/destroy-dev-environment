@@ -38,6 +38,10 @@ elif [[ $GIT_BRANCH == "main" || $GIT_BRANCH == "staging" ]]; then
   exit 1
 fi
 
+# Export terraform variables for destroy operations
+export TF_VAR_environment=$ENVIRONMENT
+export TF_VAR_branch=$CONFIG_BRANCH
+
 # shellcheck disable=SC2154
 if [ "$usage_backend" = "true" ]; then
   directories+=("infrastructure/backends")
@@ -55,8 +59,29 @@ process_directory() {
       if [[ -f "$dir/backend.hcl" ]] && ! grep -q "bucket.*=.*\"$BUCKET\"" "$dir/backend.hcl"; then
         echo "[WARNING]: Skipping $dir as backend bucket is not the same as the current bucket specified in backend-config.json"
         return
+      elif [[ -f "$dir/backend.hcl" ]] && grep -q 'bucket.*=.*"\(.*prod.*\|.*staging.*\)"' "$dir/backend.hcl"; then
+        echo "[WARNING]: Skipping $dir as backend bucket contains 'prod' or 'staging'"
+        return
       fi
-      cd "$dir"
+
+      # Special handling for backends directory - need to enable force_destroy and migrate state to local
+      if [[ $dir == */infrastructure/backends ]]; then
+        cd "$dir"
+        if [ "$DRY_RUN" = "false" ]; then
+          echo "Applying force_destroy=true to enable bucket deletion..."
+          export TF_VAR_s3_buckets='{"state":{"force_destroy":true}}'
+          terraform apply -auto-approve
+
+          echo "Moving state to local before destroying backend..."
+          mv "$dir/backend.tf" "$dir/backend.tf.bak"
+          terraform init -migrate-state -force-copy
+        else
+          echo "[DRY RUN] Would move backend.tf, migrate state to local, and delete the backend stored in S3: $BUCKET"
+        fi
+      else
+        cd "$dir"
+      fi
+
       echo "Destroying resources in $dir"
       if [ "$DRY_RUN" = "false" ]; then
         if ! eval "terraform destroy -auto-approve"; then
@@ -172,6 +197,25 @@ for base_dir in "${directories[@]}"; do
   fi
 done
 
+# Delete SSM parameter when --backend flag is used
+# shellcheck disable=SC2154
+if [[ $usage_backend = "true" ]]; then
+  REGION=$(jq -r '.state.region' "$CONFIG_PATH")
+  SSM_PARAM_NAME="/demo/terraform/backend/$CONFIG_BRANCH/config"
+  if [[ "$DRY_RUN" = "true" ]]; then
+    echo "[DRY RUN] Would delete SSM parameter at $SSM_PARAM_NAME"
+    echo "[DRY RUN] Would delete S3 bucket: $BUCKET"
+  else
+    echo "Deleting SSM parameter at $SSM_PARAM_NAME..."
+    if ! aws ssm delete-parameter --name "$SSM_PARAM_NAME" --region "$REGION" 2>/dev/null; then
+      echo "Warning: Failed to delete SSM parameter at $SSM_PARAM_NAME (may not exist)"
+    fi
+    echo "Deleting backend-config.json..."
+    rm -f "$CONFIG_PATH"
+    echo "✅ Backend cleanup complete. State bucket $BUCKET has been destroyed."
+  fi
+fi
+
 if [ "$DELETE_ERRORS" -gt 0 ]; then
   echo "=========================================================================="
   echo "FAILURE: $DELETE_ERRORS directories failed during destroy"
@@ -181,3 +225,5 @@ if [ "$DELETE_ERRORS" -gt 0 ]; then
   done
   exit 1
 fi
+
+echo "✅ Destroy complete."

@@ -1,6 +1,9 @@
 output "argocd_url" {
-  description = "The ArgoCD LoadBalancer hostname"
-  value       = data.kubernetes_service.argocd_server.status[0].load_balancer[0].ingress[0].hostname
+  description = "The ArgoCD access URL (use port-forward for ClusterIP)"
+  value = try(
+    data.kubernetes_service.argocd_server.status[0].load_balancer[0].ingress[0].hostname,
+    "ClusterIP - use: kubectl port-forward svc/argocd-server -n argocd 8080:80"
+  )
 }
 
 output "argocd_password" {

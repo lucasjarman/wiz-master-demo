@@ -5,6 +5,7 @@
 #USAGE flag "--directories <dirs>" help="Comma-separated list of directories to run init-backends  in"
 #USAGE flag "--branch <branch>" help="Branch to use for the environment"
 #USAGE flag "--hocus-pocus" help="Bypass safety checks for running on main or staging branches locally"
+#USAGE flag "--force" help="Force overwrite of existing backend-config.json (use with caution)"
 
 set -eo pipefail
 
@@ -32,6 +33,25 @@ if [[ -n "${usage_hocus_pocus:-}" ]]; then
   hocus_pocus="true"
 else
   hocus_pocus="false"
+fi
+
+# Check if backend-config.json already exists (protect against accidental overwrite)
+BACKEND_CONFIG="../backend-config.json"
+if [[ -f "$BACKEND_CONFIG" ]] && [[ -z "${usage_force:-}" ]]; then
+  echo ""
+  echo "[ERROR]: ⚠️  backend-config.json already exists!"
+  echo "[ERROR]: This file contains critical state configuration. Overwriting it could break existing deployments."
+  echo ""
+  echo "Current configuration:"
+  cat "$BACKEND_CONFIG" | jq -r '"  Bucket: \(.state.bucket)\n  Region: \(.state.region)\n  Environment: \(.environment)\n  Branch: \(.branch)"' 2>/dev/null || cat "$BACKEND_CONFIG"
+  echo ""
+  echo "[INFO]: If you want to use the existing configuration, run:"
+  echo "        mise run init-backends --directories <dirs>"
+  echo ""
+  echo "[INFO]: If you really want to bootstrap a NEW backend (and overwrite existing config), run:"
+  echo "        mise run bootstrap-branch --force --directories <dirs>"
+  echo ""
+  exit 1
 fi
 
 # Check if valid credentials exist

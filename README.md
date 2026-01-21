@@ -95,12 +95,13 @@ cp templates/mise.local.toml.template mise.local.toml
 # 3. Authenticate (once per terminal session)
 eval "$(mise run auth)"
 
-# 4. Bootstrap state backend
-mise run bootstrap-branch --directories infrastructure/shared/aws,scenarios/react2shell/aws
+# 4. Bootstrap state backend (include ALL directories)
+mise run bootstrap-branch --directories infrastructure/shared/aws,scenarios/react2shell/aws,infrastructure/wiz/develop
 
-# 5. Deploy infrastructure
+# 5. Deploy infrastructure (order matters)
 mise run apply-demo --path infrastructure/shared/aws
 mise run apply-demo --path scenarios/react2shell/aws
+mise run apply-demo --path infrastructure/wiz/develop
 
 # 6. Validate deployment
 mise run test

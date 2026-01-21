@@ -5,6 +5,7 @@
 
 | Name | Version |
 |------|---------|
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
 
@@ -51,7 +52,7 @@ No modules.
 |------|-------------|
 | <a name="output_argocd_namespace"></a> [argocd\_namespace](#output\_argocd\_namespace) | The ArgoCD namespace |
 | <a name="output_argocd_password"></a> [argocd\_password](#output\_argocd\_password) | The ArgoCD admin password |
-| <a name="output_argocd_url"></a> [argocd\_url](#output\_argocd\_url) | The ArgoCD LoadBalancer hostname |
+| <a name="output_argocd_url"></a> [argocd\_url](#output\_argocd\_url) | The ArgoCD access URL (use port-forward for ClusterIP) |
 | <a name="output_kubernetes_connector_name"></a> [kubernetes\_connector\_name](#output\_kubernetes\_connector\_name) | The Wiz Kubernetes connector name |
 | <a name="output_wiz_namespace"></a> [wiz\_namespace](#output\_wiz\_namespace) | The Wiz namespace |
 <!-- END_TF_DOCS -->

@@ -1,0 +1,222 @@
+#!/usr/bin/env bash
+#MISE description="Full deploy cycle: destroy → deploy → test (single auth)"
+
+#USAGE flag "--skip-destroy" help="Skip the destroy step (useful for fresh environments)"
+#USAGE flag "--skip-tests" help="Skip the test step"
+#USAGE flag "--verbose" help="Enable verbose output"
+
+set -eo pipefail
+
+# -----------------------------------------------------------------------------
+# Full Deploy Script
+# -----------------------------------------------------------------------------
+# This script runs the complete deployment cycle with a SINGLE 1Password
+# authentication at the start. All credentials are exported to the shell,
+# then inherited by all subsequent commands.
+#
+# Flow:
+#   1. Authenticate (single 1Password prompt)
+#   2. Destroy existing environment (optional)
+#   3. Deploy shared infrastructure
+#   4. Deploy scenarios
+#   5. Deploy Wiz integration
+#   6. Run integration tests
+# -----------------------------------------------------------------------------
+
+echo ""
+echo "=============================================="
+echo "  Wiz Demo Full Deployment"
+echo "=============================================="
+echo ""
+
+# Parse flags
+SKIP_DESTROY=false
+SKIP_TESTS=false
+VERBOSE=false
+
+if [[ "${usage_skip_destroy:-}" == "true" ]]; then
+  SKIP_DESTROY=true
+fi
+
+if [[ "${usage_skip_tests:-}" == "true" ]]; then
+  SKIP_TESTS=true
+fi
+
+if [[ "${usage_verbose:-}" == "true" ]]; then
+  VERBOSE=true
+  export VERBOSE
+fi
+
+# -----------------------------------------------------------------------------
+# Step 0: Single Authentication
+# -----------------------------------------------------------------------------
+echo "📦 Step 0: Authenticating (single 1Password prompt)..."
+echo ""
+
+# Check if credentials are already in environment
+if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]] || [[ -z "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+  echo "⚠️  AWS credentials not found in environment."
+  echo "   Run this command first, then re-run full-deploy:"
+  echo ""
+  echo "   eval \"\$(mise run auth)\""
+  echo ""
+  exit 1
+fi
+
+# Verify AWS authentication
+echo "Verifying AWS authentication..."
+if ! AWS_IDENTITY=$(aws sts get-caller-identity --query Arn --output text 2>/dev/null); then
+  echo "❌ AWS authentication failed. Credentials may be expired."
+  echo "   Run: eval \"\$(mise run auth)\""
+  exit 1
+fi
+echo "✅ Authenticated as: $AWS_IDENTITY"
+
+# Verify Wiz credentials if deploying wiz
+if [[ -z "${WIZ_CLIENT_ID:-}" ]] || [[ -z "${WIZ_CLIENT_SECRET:-}" ]]; then
+  echo "⚠️  WIZ_CLIENT_ID/WIZ_CLIENT_SECRET not set. Wiz integration may fail."
+fi
+
+# Get public IP if not already set
+if [[ -z "${TF_VAR_allowed_cidrs:-}" ]] && [[ "${AUTO_DETECT_PUBLIC_IP:-}" == "true" ]]; then
+  echo "Detecting public IP..."
+  PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || echo "")
+  if [[ -n "$PUBLIC_IP" ]]; then
+    export TF_VAR_allowed_cidrs="[\"${PUBLIC_IP}/32\"]"
+    echo "✅ Public IP: $PUBLIC_IP"
+  fi
+fi
+
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 1: Destroy (optional)
+# -----------------------------------------------------------------------------
+if [[ "$SKIP_DESTROY" == "false" ]]; then
+  echo "🗑️  Step 1: Destroying existing environment..."
+  echo ""
+
+  # Run destroy with no-dry-run
+  if ! mise run local-dev:destroy-dev-environment --no-dry-run; then
+    echo "⚠️  Destroy had some errors (may be expected for fresh env)"
+  fi
+
+  echo ""
+  echo "✅ Destroy complete"
+  echo ""
+else
+  echo "⏭️  Step 1: Skipping destroy (--skip-destroy flag)"
+  echo ""
+fi
+
+# -----------------------------------------------------------------------------
+# Step 2: Deploy Shared Infrastructure
+# -----------------------------------------------------------------------------
+echo "🏗️  Step 2: Deploying shared infrastructure..."
+echo ""
+
+mise run apply-demo --path infrastructure/shared/aws
+
+echo ""
+echo "✅ Shared infrastructure deployed"
+echo ""
+
+# Update kubeconfig for EKS cluster
+echo "📋 Updating kubeconfig..."
+CLUSTER_NAME=$(cd "$GIT_ROOT/infrastructure/shared/aws" && terraform output -raw cluster_name 2>/dev/null || echo "wiz-demo-eks")
+AWS_REGION=$(cd "$GIT_ROOT/infrastructure/shared/aws" && terraform output -raw aws_region 2>/dev/null || echo "ap-southeast-2")
+export KUBECONFIG="${KUBECONFIG:-/tmp/kubeconfig-wiz-demo}"
+
+aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION" --kubeconfig "$KUBECONFIG"
+echo "✅ Kubeconfig updated: $KUBECONFIG"
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 3: Deploy Scenarios
+# -----------------------------------------------------------------------------
+echo "🚀 Step 3: Deploying react2shell scenario..."
+echo ""
+
+mise run apply-demo --path scenarios/react2shell/aws
+
+echo ""
+echo "✅ Scenario deployed"
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 4: Deploy Wiz Integration
+# -----------------------------------------------------------------------------
+echo "🔐 Step 4: Deploying Wiz integration..."
+echo ""
+
+mise run apply-demo --path infrastructure/wiz/develop
+
+echo ""
+echo "✅ Wiz integration deployed"
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 5: Wait for pods to be ready
+# -----------------------------------------------------------------------------
+echo "⏳ Step 5: Waiting for pods to be ready..."
+echo ""
+
+# Wait for Wiz pods
+echo "Waiting for Wiz pods..."
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=wiz-sensor -n wiz --timeout=120s 2>/dev/null || true
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=wiz-admission-controller -n wiz --timeout=120s 2>/dev/null || true
+
+# Wait for react2shell app
+REACT2SHELL_NS=$(kubectl get ns -o name 2>/dev/null | grep react2shell | head -1 | cut -d'/' -f2 || echo "")
+if [[ -n "$REACT2SHELL_NS" ]]; then
+  echo "Waiting for react2shell pods in namespace: $REACT2SHELL_NS..."
+  kubectl wait --for=condition=ready pod -l app -n "$REACT2SHELL_NS" --timeout=120s 2>/dev/null || true
+fi
+
+echo ""
+echo "✅ Pods ready"
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 6: Run Tests (optional)
+# -----------------------------------------------------------------------------
+if [[ "$SKIP_TESTS" == "false" ]]; then
+  echo "🧪 Step 6: Running integration tests..."
+  echo ""
+
+  # Give services a moment to stabilize
+  sleep 10
+
+  if mise run test all; then
+    echo ""
+    echo "✅ All tests passed!"
+  else
+    echo ""
+    echo "❌ Some tests failed. Review output above."
+    exit 1
+  fi
+else
+  echo "⏭️  Step 6: Skipping tests (--skip-tests flag)"
+fi
+
+# -----------------------------------------------------------------------------
+# Summary
+# -----------------------------------------------------------------------------
+echo ""
+echo "=============================================="
+echo "  Deployment Complete!"
+echo "=============================================="
+echo ""
+echo "Environment:"
+echo "  - EKS Cluster: $CLUSTER_NAME"
+echo "  - Region: $AWS_REGION"
+echo "  - Kubeconfig: $KUBECONFIG"
+echo ""
+echo "Access:"
+echo "  - App: kubectl get svc -n $REACT2SHELL_NS (use EXTERNAL-IP)"
+echo "  - ArgoCD: kubectl port-forward svc/argocd-server -n argocd 8080:80"
+echo ""
+echo "Next steps:"
+echo "  1. Check Wiz console for the connected cluster"
+echo "  2. Run the exploit script to trigger threat detection"
+echo ""

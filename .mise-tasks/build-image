@@ -27,7 +27,7 @@ APP_DIR="$GIT_ROOT/app/$APP_NAME"
 if [[ ! -d "$APP_DIR" ]]; then
   echo "ERROR: Application directory not found: $APP_DIR" >&2
   echo "  Available apps:" >&2
-  ls -1 "$GIT_ROOT/app/" 2>/dev/null | sed 's/^/    - /' >&2
+  find "$GIT_ROOT/app/" -maxdepth 1 -mindepth 1 -type d -printf '    - %f\n' 2>/dev/null >&2 || true
   exit 1
 fi
 
@@ -64,9 +64,9 @@ if [[ "${usage_no_cache:-}" == "true" ]]; then
   BUILD_OPTS+=("--no-cache")
 fi
 
-# Build image
+# Build image for amd64 (EKS nodes are amd64)
 echo "=== Building Image ==="
-docker build "${BUILD_OPTS[@]}" -t "$ECR_REPO:$TAG" -t "$FULL_IMAGE" "$APP_DIR"
+docker build --platform linux/amd64 "${BUILD_OPTS[@]}" -t "$ECR_REPO:$TAG" -t "$FULL_IMAGE" "$APP_DIR"
 
 if [[ "${usage_push:-}" == "true" ]]; then
   echo ""
