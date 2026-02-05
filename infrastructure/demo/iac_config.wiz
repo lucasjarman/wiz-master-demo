@@ -10,7 +10,7 @@
 
 terraform:
   dynamicBackends:
-    {{ENVIRONMENT}}:
-      bucket: "{{BUCKET}}"
-      region: "{{REGION}}"
-      key: "{{STATE_KEY}}"
+    dev:
+      bucket: "wiz-demo-tfstate-lucasjarman"
+      region: "ap-southeast-2"
+      key: "infrastructure/demo/terraform.tfstate"

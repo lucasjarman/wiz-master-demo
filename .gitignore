@@ -12,7 +12,8 @@
 *.tfplan
 backend.tf
 backend.hcl
-iac_config.wiz
+# Note: iac_config.wiz is NOT ignored - it must be committed for Wiz Code-to-Cloud mapping
+# Regenerate with: mise run init-backends
 
 # Mise/fnox (local config)
 mise.local.toml
