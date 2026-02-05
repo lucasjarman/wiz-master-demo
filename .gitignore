@@ -12,6 +12,7 @@
 *.tfplan
 backend.tf
 backend.hcl
+iac_config.wiz
 
 # Mise/fnox (local config)
 mise.local.toml

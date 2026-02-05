@@ -51,6 +51,31 @@ fi
 
 BUCKET=$(jq -r '.state.bucket' "$CONFIG_PATH")
 REGION=$(jq -r '.state.region' "$CONFIG_PATH")
+ENVIRONMENT=$(jq -r '.environment' "$CONFIG_PATH")
+
+# Template for iac_config.wiz (Wiz Code-to-Cloud mapping)
+IAC_CONFIG_TEMPLATE="$GIT_ROOT/templates/iac_config.wiz.template"
+
+# Generate iac_config.wiz file for Wiz Code-to-Cloud mapping
+generate_iac_config() {
+  local dir="$1"
+  local state_key="$2"
+
+  if [[ ! -f "$IAC_CONFIG_TEMPLATE" ]]; then
+    echo "Warning: iac_config.wiz.template not found, skipping Wiz config generation"
+    return
+  fi
+
+  local iac_config_file="$dir/iac_config.wiz"
+  echo "Generating iac_config.wiz in $dir"
+
+  # Replace placeholders in template
+  sed -e "s|{{ENVIRONMENT}}|${ENVIRONMENT}|g" \
+    -e "s|{{BUCKET}}|${BUCKET}|g" \
+    -e "s|{{REGION}}|${REGION}|g" \
+    -e "s|{{STATE_KEY}}|${state_key}|g" \
+    "$IAC_CONFIG_TEMPLATE" >"$iac_config_file"
+}
 
 execute_init_serial() {
   echo "🚀 Starting serial backend initialization..."
@@ -170,6 +195,10 @@ key    = "${STATE_PATH}/terraform.tfstate"
 region = "${REGION}"
 EOF
       echo "State file will be stored at: ${STATE_PATH}/terraform.tfstate"
+
+      # Generate iac_config.wiz for Wiz Code-to-Cloud mapping
+      generate_iac_config "$dir" "${STATE_PATH}/terraform.tfstate"
+
       cd "$dir"
       if [[ $FORCE_RECREATE == "true" ]] || [[ $backend_changed == "true" ]]; then
         echo "Cleaning .terraform directory for a fresh start"
@@ -180,11 +209,18 @@ EOF
 
     elif [[ $backend_exists == "true" && ! -f "$dir/backend.hcl" ]]; then
       echo "Building backend.hcl for backend.tf"
+      local rel_path
+      rel_path=$(python3 -c "import os.path; print(os.path.relpath('$dir', '$GIT_ROOT'))")
+      STATE_PATH="$rel_path"
       cat >"$dir/backend.hcl" <<EOF
 bucket = "${BUCKET}"
 key    = "${STATE_PATH}/terraform.tfstate"
 region = "${REGION}"
 EOF
+
+      # Generate iac_config.wiz for Wiz Code-to-Cloud mapping
+      generate_iac_config "$dir" "${STATE_PATH}/terraform.tfstate"
+
       echo "Running terraform init in $dir"
       cd "$dir"
       terraform init
