@@ -3,6 +3,11 @@ output "role_arn" {
   description = "Wiz Access Role ARN"
 }
 
+output "role_name" {
+  value       = aws_iam_role.user_role_tf.name
+  description = "Wiz Access Role Name"
+}
+
 output "enabled_policy_types" {
   value       = join(", ", keys(local.enabled_policies))
   description = "List of enabled policy types"

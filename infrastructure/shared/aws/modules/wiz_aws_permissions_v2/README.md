@@ -61,4 +61,5 @@ No modules.
 | <a name="output_enabled_policy_types"></a> [enabled\_policy\_types](#output\_enabled\_policy\_types) | List of enabled policy types |
 | <a name="output_latest_policy_modification_date"></a> [latest\_policy\_modification\_date](#output\_latest\_policy\_modification\_date) | Latest modification date of the policies |
 | <a name="output_role_arn"></a> [role\_arn](#output\_role\_arn) | Wiz Access Role ARN |
+| <a name="output_role_name"></a> [role\_name](#output\_role\_name) | Wiz Access Role Name |
 <!-- END_TF_DOCS -->
