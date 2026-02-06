@@ -36,6 +36,7 @@ if [ -n "${usage_directories:-}" ]; then
 else
   echo "No directories provided, using default directories"
   directories=(
+    "infrastructure/backends"
     "infrastructure/shared/aws"
     "infrastructure/wiz/develop"
     "scenarios"

@@ -7,6 +7,7 @@ set -eo pipefail
 
 TEMPLATE_DIR="$GIT_ROOT/templates"
 TEMPLATE_FILE="$TEMPLATE_DIR/iac_config.wiz.template"
+CONFIG_PATH="$GIT_ROOT/infrastructure/backend-config.json"
 RECREATE=false
 
 # shellcheck disable=SC2154
@@ -20,29 +21,44 @@ if [[ ! -f $TEMPLATE_FILE ]]; then
   exit 1
 fi
 
+if [[ ! -f $CONFIG_PATH ]]; then
+  echo "Error: Backend config not found at $CONFIG_PATH"
+  echo "Run mise run bootstrap-branch first."
+  exit 1
+fi
+
+# Read configuration from backend-config.json
+BUCKET=$(jq -r '.state.bucket' "$CONFIG_PATH")
+REGION=$(jq -r '.state.region' "$CONFIG_PATH")
+ENVIRONMENT=$(jq -r '.environment' "$CONFIG_PATH")
+
 if [ -n "${usage_directories:-}" ]; then
   IFS=',' read -ra directories <<<"$usage_directories"
   echo "Using custom directories: ${directories[*]}"
 else
   echo "No directories provided, using default directories"
   directories=(
+    "infrastructure/backends"
     "infrastructure/shared/aws"
     "infrastructure/wiz/develop"
     "scenarios"
   )
 fi
 
-update_template_regions() {
-  local state_path="$1"
-  while IFS= read -r line || [[ -n $line ]]; do
-    echo "$line"
-    if [[ $line == *"bucket:"* ]]; then
-      bucket=$(echo "$line" | sed -E 's/.*"([^"]+)".*/\1/')
-      region=$(echo "$bucket" | sed -E 's/.*bucket-(.+)$/\1/')
-      echo "      region: \"$region\""
-      echo "      key: \"$state_path/terraform.tfstate\""
-    fi
-  done <"$TEMPLATE_FILE"
+# Generate iac_config.wiz file for Wiz Code-to-Cloud mapping
+generate_iac_config() {
+  local dir="$1"
+  local state_key="$2"
+
+  local iac_config_file="$dir/iac_config.wiz"
+  echo "Generating iac_config.wiz in $dir"
+
+  # Replace placeholders in template
+  sed -e "s|{{ENVIRONMENT}}|${ENVIRONMENT}|g" \
+    -e "s|{{BUCKET}}|${BUCKET}|g" \
+    -e "s|{{REGION}}|${REGION}|g" \
+    -e "s|{{STATE_KEY}}|${state_key}|g" \
+    "$TEMPLATE_FILE" >"$iac_config_file"
 }
 
 copy_iac_config() {
@@ -50,26 +66,25 @@ copy_iac_config() {
   local config_file="$dir/iac_config.wiz"
   local rel_path
   rel_path=$(python3 -c "import os.path; print(os.path.relpath('$dir', '$GIT_ROOT'))")
-  STATE_PATH="$rel_path"
+  local state_key="$rel_path/terraform.tfstate"
 
   if [[ ! -f $config_file || $RECREATE == "true" ]]; then
-    echo "Creating iac_config.wiz in $dir"
-    update_template_regions "$STATE_PATH" >"$config_file"
-
+    generate_iac_config "$dir" "$state_key"
   else
-    local template_with_regions
-    template_with_regions=$(update_template_regions "$STATE_PATH")
+    # Generate to temp file and compare
+    local temp_file
+    temp_file=$(mktemp)
+    sed -e "s|{{ENVIRONMENT}}|${ENVIRONMENT}|g" \
+      -e "s|{{BUCKET}}|${BUCKET}|g" \
+      -e "s|{{REGION}}|${REGION}|g" \
+      -e "s|{{STATE_KEY}}|${state_key}|g" \
+      "$TEMPLATE_FILE" >"$temp_file"
 
-    local template_hash
-    template_hash=$(echo "$template_with_regions" | sha256sum | cut -d' ' -f1)
-
-    local existing_hash
-    existing_hash=$(sha256sum "$config_file" | cut -d' ' -f1)
-
-    if [[ $template_hash != "$existing_hash" ]]; then
+    if ! diff -q "$temp_file" "$config_file" >/dev/null 2>&1; then
       echo "iac_config.wiz in $dir differs from template, recreating"
-      echo "$template_with_regions" >"$config_file"
-      echo "Updated iac_config.wiz in $dir"
+      mv "$temp_file" "$config_file"
+    else
+      rm "$temp_file"
     fi
   fi
 }
