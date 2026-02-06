@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+#MISE description="One-command deploy for infrastructure/demo single-root module"
+
+#USAGE flag "--skip-image" help="Skip building and pushing Docker image"
+#USAGE flag "--skip-verify" help="Skip deployment verification"
+
+set -eo pipefail
+
+GIT_ROOT=$(git rev-parse --show-toplevel)
+DEMO_DIR="$GIT_ROOT/infrastructure/demo"
+BACKEND_CONFIG="$GIT_ROOT/infrastructure/backend-config.json"
+
+echo ""
+echo "=============================================="
+echo "  Wiz Demo - Single Root Deployment"
+echo "=============================================="
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step -1: Optional demo-only AWS credentials (guardrail)
+# -----------------------------------------------------------------------------
+if [[ -n "${DEMO_AWS_ACCESS_KEY_ID:-}" ]]; then
+  # shellcheck source=/dev/null
+  source "$(command -v demo-aws.sh)"
+  demo_aws_activate
+fi
+
+# -----------------------------------------------------------------------------
+# Step 0: Verify Prerequisites
+# -----------------------------------------------------------------------------
+echo "📋 Checking prerequisites..."
+
+if [[ -z "${AWS_ACCESS_KEY_ID:-}" || -z "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+  echo "❌ AWS credentials not found."
+  echo "   Option A (demo-only env vars):"
+  echo "     export DEMO_AWS_ACCESS_KEY_ID='...'"
+  echo "     export DEMO_AWS_SECRET_ACCESS_KEY='...'"
+  echo "     export DEMO_AWS_ACCOUNT_ID='123456789012'  # safety guardrail"
+  echo "   Option B (fnox/1Password):"
+  echo "     eval \"\$(mise run auth)\""
+  exit 1
+fi
+
+AWS_IDENTITY=$(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "")
+echo "✅ AWS: ${AWS_IDENTITY:-unknown}"
+
+# Check Docker (unless skipping image)
+if [[ "${usage_skip_image:-}" != "true" ]]; then
+  if ! docker info &>/dev/null; then
+    echo "❌ Docker is not running. Start Docker or use --skip-image"
+    exit 1
+  fi
+  echo "✅ Docker: running"
+fi
+
+# Get region from environment or default
+REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-ap-southeast-2}}"
+echo "✅ Region: $REGION"
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 1: Bootstrap (if needed)
+# -----------------------------------------------------------------------------
+if [[ ! -f "$BACKEND_CONFIG" ]]; then
+  echo "🔧 Step 1: Bootstrapping state backend..."
+  mise run bootstrap-branch --directories infrastructure/demo
+  echo ""
+else
+  echo "✅ Step 1: Backend already bootstrapped"
+fi
+
+# Ensure demo directory has backend.tf
+if [[ ! -f "$DEMO_DIR/backend.tf" ]]; then
+  echo "🔧 Initializing backend for infrastructure/demo..."
+  mise run init-backends --directories infrastructure/demo
+fi
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 2: Terraform Apply
+# -----------------------------------------------------------------------------
+echo "🏗️  Step 2: Applying infrastructure/demo..."
+echo ""
+
+cd "$DEMO_DIR"
+terraform init -input=false
+terraform apply -auto-approve
+
+# Get outputs
+CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "wiz-demo-eks")
+SUFFIX=$(terraform output -raw suffix 2>/dev/null || echo "unknown")
+NAMESPACE="react2shell-${SUFFIX}"
+
+echo ""
+echo "✅ Infrastructure deployed (suffix: $SUFFIX)"
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 3: Update Kubeconfig
+# -----------------------------------------------------------------------------
+echo "📋 Step 3: Updating kubeconfig..."
+export KUBECONFIG="${KUBECONFIG:-$GIT_ROOT/kubeconfig}"
+aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$REGION" --kubeconfig "$KUBECONFIG"
+echo "✅ Kubeconfig: $KUBECONFIG"
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 4: Build and Push Docker Image
+# -----------------------------------------------------------------------------
+if [[ "${usage_skip_image:-}" != "true" ]]; then
+  echo "🐳 Step 4: Building and pushing Docker image..."
+  cd "$GIT_ROOT"
+  mise run build-image --push
+
+  echo ""
+  echo "Restarting deployment to pull new image..."
+  kubectl rollout restart deployment/"react2shell-${SUFFIX}" -n "$NAMESPACE"
+  kubectl rollout status deployment/"react2shell-${SUFFIX}" -n "$NAMESPACE" --timeout=120s
+  echo ""
+else
+  echo "⏭️  Step 4: Skipping image build (--skip-image)"
+  echo ""
+fi
+
+# -----------------------------------------------------------------------------
+# Step 5: Verify Deployment
+# -----------------------------------------------------------------------------
+if [[ "${usage_skip_verify:-}" != "true" ]]; then
+  echo "🔍 Step 5: Verifying deployment..."
+  echo ""
+
+  # Wait for pods
+  echo "Waiting for pods..."
+  kubectl wait --for=condition=ready pod -l app -n "$NAMESPACE" --timeout=120s 2>/dev/null || true
+
+  # Get NLB hostname
+  NLB=$(kubectl get svc -n "$NAMESPACE" -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+
+  if [[ -n "$NLB" ]]; then
+    echo "Testing app connectivity..."
+    for i in {1..10}; do
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://$NLB" 2>/dev/null || echo "000")
+      if [[ "$HTTP_CODE" == "200" ]]; then
+        echo "✅ App responding: HTTP $HTTP_CODE"
+        break
+      fi
+      echo "  Attempt $i: HTTP $HTTP_CODE (waiting...)"
+      sleep 10
+    done
+  fi
+  echo ""
+else
+  echo "⏭️  Step 5: Skipping verification (--skip-verify)"
+  echo ""
+fi
+
+# -----------------------------------------------------------------------------
+# Summary
+# -----------------------------------------------------------------------------
+echo "=============================================="
+echo "  Deployment Complete!"
+echo "=============================================="
+echo ""
+echo "Suffix:     $SUFFIX"
+echo "Cluster:    $CLUSTER_NAME"
+echo "Namespace:  $NAMESPACE"
+echo "Kubeconfig: $KUBECONFIG"
+echo ""
+echo "App URL:    http://$NLB"
+echo ""
+echo "To destroy: mise run destroy-demo"
+echo ""
