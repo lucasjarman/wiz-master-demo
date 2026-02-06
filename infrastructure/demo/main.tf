@@ -260,7 +260,7 @@ module "wiz_aws_permissions" {
   enable_lightsail_scanning        = false
   enable_data_scanning             = true
   enable_eks_scanning              = true
-  enable_terraform_bucket_scanning = false
+  enable_terraform_bucket_scanning = true # Required for Wiz Code-to-Cloud IaC mapping
   enable_cloud_cost_scanning       = false
   enable_defend_scanning           = true
 }
