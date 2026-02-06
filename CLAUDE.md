@@ -355,6 +355,44 @@ The ECR connector may show `CONNECTION_ERROR` but this is non-blocking. Containe
 - AWS cloud connector (auto-connect feature)
 - EKS connector (runtime detection)
 
+### 12) Wiz Defend Demo (Attack Script)
+
+The attack script `scripts/exploit/wiz-demo-v4.sh` creates a clean threat chain for Wiz Defend demonstration.
+
+**Attack Chain:**
+```
+React2Shell (RCE) → Container Activity → Cloud Identity → S3 Exfil
+```
+
+**Usage:**
+```bash
+# Auto-detect S3 bucket from terraform:
+./scripts/exploit/wiz-demo-v4.sh <nlb-hostname>
+
+# Manual bucket specification:
+./scripts/exploit/wiz-demo-v4.sh <nlb-hostname> <s3-bucket-name>
+```
+
+**Expected Wiz Defend Detections:**
+
+| Phase | Detection | Rule ID | Description |
+|-------|-----------|---------|-------------|
+| 1. Initial Access | Web service command | (signal) | `webServiceOrDescendantOf` context |
+| 2. Container Activity | Reverse shell pattern | `cer-sen-id-458` | Bash reverse shell command line |
+| 2. Container Activity | Sensitive file access | `cer-sen-id-*` | K8s token, /etc/shadow |
+| 2. Container Activity | Cron persistence | `cer-sen-id-6` | Crontab modification |
+| 3. Cloud Identity | Unusual STS call | `cer-aws-identity-unusualGetCallerIdentity` | GetCallerIdentity from pod |
+| 4. S3 Exfil | S3 Data Events | (CloudTrail) | ListBucket, GetObject (if enabled) |
+
+**Threat Grouping:**
+Wiz groups detections within 24 hours on the same entity into a single threat. The attack script should produce 1 grouped threat with multiple correlated detections.
+
+**Verify Results:**
+1. Navigate to **Defend → Threats** in Wiz Console
+2. Filter by pod name (e.g., `react2shell`)
+3. Expand the threat to see correlated detections
+4. Check **Event Groups** tab for the attack timeline
+
 ## Mise Tasks
 
 | Task | Description |
