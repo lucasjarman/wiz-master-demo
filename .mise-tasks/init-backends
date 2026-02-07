@@ -181,15 +181,21 @@ process_directory() {
       rel_path=$(python3 -c "import os.path; print(os.path.relpath('$dir', '$GIT_ROOT'))")
       STATE_PATH="$rel_path"
 
+      # Generate FULLY DEFINED backend.tf for Wiz Code-to-Cloud mapping
+      # Wiz requires bucket/key/region to be in backend.tf (iac_config.wiz doesn't work reliably)
       cat >"$dir/backend.tf" <<EOF
 terraform {
   backend "s3" {
-  encrypt = true
-  use_lockfile = true
+    bucket       = "${BUCKET}"
+    key          = "${STATE_PATH}/terraform.tfstate"
+    region       = "${REGION}"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 EOF
 
+      # Also generate backend.hcl for backwards compatibility with -backend-config flag
       cat >"$dir/backend.hcl" <<EOF
 bucket = "${BUCKET}"
 key    = "${STATE_PATH}/terraform.tfstate"
@@ -197,7 +203,7 @@ region = "${REGION}"
 EOF
       echo "State file will be stored at: ${STATE_PATH}/terraform.tfstate"
 
-      # Generate iac_config.wiz for Wiz Code-to-Cloud mapping
+      # Generate iac_config.wiz for Wiz Code-to-Cloud mapping (kept for reference, but backend.tf is now fully defined)
       generate_iac_config "$dir" "${STATE_PATH}/terraform.tfstate"
 
       cd "$dir"
