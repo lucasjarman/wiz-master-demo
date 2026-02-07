@@ -158,7 +158,11 @@ variable "wiz_admission_controller_enabled" {
   default     = true
 }
 
-
+variable "state_bucket_name" {
+  description = "Name of the S3 bucket storing Terraform state. Required for Wiz Code-to-Cloud IaC mapping when bucket name doesn't match *terraform*/*tfstate* patterns."
+  type        = string
+  default     = ""
+}
 
 variable "tenant_image_pull_username" {
   description = "Username for pulling Wiz images"

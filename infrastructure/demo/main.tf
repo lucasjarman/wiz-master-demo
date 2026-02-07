@@ -22,6 +22,10 @@ locals {
   cluster_name = "${var.prefix}-${local.suffix}-eks"
   ecr_name     = "${var.prefix}-${local.suffix}-app"
 
+  # State bucket name for Wiz Code-to-Cloud IaC mapping
+  # This comes from the bootstrap process (backend-config.json / iac_config.wiz)
+  state_bucket_name = var.state_bucket_name
+
   # Common tags
   tags = merge(var.common_tags, {
     Environment = var.environment
@@ -265,6 +269,34 @@ module "wiz_aws_permissions" {
   enable_defend_scanning           = true
 }
 
+# Grant Wiz explicit access to the Terraform state bucket
+# The WizTerraformScanningPolicy only matches buckets with *terraform*, *tfstate*, *tf?state*
+# Our state bucket name (demo-dev-*-state-bucket-*) doesn't match those patterns
+resource "aws_iam_role_policy" "wiz_state_bucket_access" {
+  count = var.create_wiz_connector && var.wiz_trusted_arn != "" && var.state_bucket_name != "" ? 1 : 0
+  name  = "${local.suffix}-WizStateBucketAccess"
+  role  = module.wiz_aws_permissions[0].role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "AllowWizStateBucketAccess"
+      Effect = "Allow"
+      Action = [
+        "s3:GetBucketLocation",
+        "s3:GetObject",
+        "s3:GetObjectTagging",
+        "s3:ListBucket"
+      ]
+      Resource = [
+        "arn:aws:s3:::${local.state_bucket_name}",
+        "arn:aws:s3:::${local.state_bucket_name}/*"
+      ]
+    }]
+  })
+
+  depends_on = [module.wiz_aws_permissions]
+}
 
 # =============================================================================
 # Wiz Service Account (for K8s Integration)

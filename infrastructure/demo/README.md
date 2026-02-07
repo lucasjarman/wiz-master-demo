@@ -44,6 +44,7 @@
 |------|------|
 | [aws_cloudtrail.demo](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudtrail) | resource |
 | [aws_ecr_repository.app](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecr_repository) | resource |
+| [aws_iam_role_policy.wiz_state_bucket_access](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_kms_alias.cloudtrail](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/kms_alias) | resource |
 | [aws_kms_key.cloudtrail](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/kms_key) | resource |
 | [aws_s3_bucket.cloudtrail_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket) | resource |
@@ -91,6 +92,7 @@
 | <a name="input_enabled_logs"></a> [enabled\_logs](#input\_enabled\_logs) | Toggle for Wiz Defend log types. CloudTrail includes S3 Data Events. | <pre>object({<br/>    cloudtrail   = bool<br/>    route53_logs = bool<br/>  })</pre> | <pre>{<br/>  "cloudtrail": true,<br/>  "route53_logs": true<br/>}</pre> | no |
 | <a name="input_environment"></a> [environment](#input\_environment) | Environment name (dev, staging, prod) | `string` | `"dev"` | no |
 | <a name="input_prefix"></a> [prefix](#input\_prefix) | Prefix for all resource names | `string` | `"wiz-demo"` | no |
+| <a name="input_state_bucket_name"></a> [state\_bucket\_name](#input\_state\_bucket\_name) | Name of the S3 bucket storing Terraform state. Required for Wiz Code-to-Cloud IaC mapping when bucket name doesn't match *terraform*/*tfstate* patterns. | `string` | `""` | no |
 | <a name="input_tenant_image_pull_password"></a> [tenant\_image\_pull\_password](#input\_tenant\_image\_pull\_password) | Password for pulling Wiz images | `string` | `""` | no |
 | <a name="input_tenant_image_pull_username"></a> [tenant\_image\_pull\_username](#input\_tenant\_image\_pull\_username) | Username for pulling Wiz images | `string` | `""` | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR block for VPC | `string` | `"10.0.0.0/16"` | no |
