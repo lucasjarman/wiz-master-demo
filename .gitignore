@@ -10,10 +10,11 @@
 *.tfvars
 !common.auto.tfvars
 *.tfplan
-backend.tf
+# Note: backend.tf is NOT ignored - it must be committed for Wiz Code-to-Cloud IaC mapping
+# The partial backend config (no secrets) is safe to commit; actual values come from:
+#   - iac_config.wiz (committed) - provides bucket/region/key for Wiz to resolve
+#   - backend.hcl (gitignored) - provides values at terraform init time
 backend.hcl
-# Note: iac_config.wiz is NOT ignored - it must be committed for Wiz Code-to-Cloud mapping
-# Regenerate with: mise run init-backends
 
 # Mise/fnox (local config)
 mise.local.toml
