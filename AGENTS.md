@@ -326,29 +326,120 @@ terraform output route53_sqs_queue_url
 
 ### 11) Wiz Code-to-Cloud Mapping
 
-Wiz Code-to-Cloud links cloud resources back to their Terraform source code. This requires `iac_config.wiz` files in directories with `backend.tf`.
+Wiz Code-to-Cloud has **two separate correlation paths**:
+
+1. **IaC Mapping** - Links cloud resources (EKS, S3, IAM) to Terraform code
+2. **Container Image Mapping** - Links container images to their Dockerfiles
+
+---
+
+#### 11a) IaC Code-to-Cloud (Terraform → Cloud Resources)
 
 **How It Works:**
-1. `iac_config.wiz` tells Wiz where to find the Terraform state file
-2. Wiz reads the state file to discover resource → code mappings
-3. Resources show "Managed by Terraform" with links to source files
+1. Wiz VCS Connector scans the repo and finds `backend.tf` files
+2. Wiz Cloud Connector reads the Terraform state file from S3
+3. Creates `IAC_BACKEND` → `IAC_DEPLOYMENT` → `IAC_RESOURCE` entities
+4. Cloud resources show "Defined in Code" relationships
 
-**Generated Files:**
+**IMPORTANT: Use Fully Defined `backend.tf`**
 
-| Directory | State Key | Maps To |
-|-----------|-----------|---------|
-| `infrastructure/backends` | `infrastructure/backends/terraform.tfstate` | State bucket itself |
-| `infrastructure/demo` | `infrastructure/demo/terraform.tfstate` | Demo resources (EKS, VPC, S3, etc.) |
+The `iac_config.wiz` approach (partial backends) **does not work reliably**. Instead, use fully defined `backend.tf` files with hardcoded bucket/key/region:
 
-**Regenerate After Backend Changes:**
-```bash
-mise run create-wiz-iac-files --recreate
+```hcl
+# infrastructure/demo/backend.tf
+terraform {
+  backend "s3" {
+    bucket       = "demo-dev-c1dfca-state-bucket-ap-southeast-2"  # Hardcoded
+    key          = "infrastructure/demo/terraform.tfstate"         # Hardcoded
+    region       = "ap-southeast-2"                                # Hardcoded
+    encrypt      = true
+    use_lockfile = true
+  }
+}
 ```
 
-**Important Notes:**
-- `iac_config.wiz` files **must be committed to the default branch** (main)
-- Wiz scans the repo periodically; trigger manual rescan in **Settings → Deployments → GitHub Connector → Trigger Scan**
-- The AWS connector needs `WizTerraformScanningPolicy` permissions to read state files from S3
+The `mise run init-backends` task generates these fully defined files automatically from `backend-config.json`.
+
+**Verification:**
+```bash
+# Check IAC_BACKEND is not partial
+# In Wiz Explorer, search for IAC_BACKEND and verify isPartial: false
+```
+
+**Troubleshooting:**
+- If `IAC_BACKEND` shows `isPartial: true`, the backend.tf is missing bucket/key/region
+- `IAC_DEPLOYMENT` is created when cloud scanner reads the state file (may take hours)
+- Trigger VCS rescan: **Settings → Deployments → GitHub Connector → Trigger Scan**
+
+---
+
+#### 11b) Container Image Code-to-Cloud (Image → Dockerfile)
+
+**Two Methods:**
+
+| Method | How It Works | When to Use |
+|--------|--------------|-------------|
+| **CLI-based** | `wizcli docker scan` + `wizcli docker tag` in CI/CD | Deterministic 1:1 mapping |
+| **Seamless VCS** | VCS Connector analyzes Dockerfiles automatically | Automatic but not always deterministic |
+
+**CLI-based Workflow (Recommended):**
+
+The scan must happen **BEFORE** pushing to registry:
+
+```bash
+# 1. Build image locally (don't push yet)
+docker build -t $IMAGE_TAG -f app/nextjs/Dockerfile .
+
+# 2. Scan BEFORE pushing (links to Dockerfile)
+wizcli docker scan --image $IMAGE_TAG --dockerfile app/nextjs/Dockerfile
+
+# 3. Push to registry
+docker push $IMAGE_TAG
+
+# 4. Tag AFTER pushing (uploads digest + metadata to Wiz)
+wizcli docker tag --image $IMAGE_TAG
+```
+
+**CRITICAL: Order matters!**
+- Scanning an already-pushed image does NOT establish code correlation
+- The `--dockerfile` flag must point to the actual Dockerfile used to build
+
+**Verification:**
+```bash
+# Check container image has code_detected = true
+# In Wiz Explorer, search for the container image and check:
+# - lifecycleStagesV2_code_detected: true
+# - lifecycleStagesV2_build_detected: true
+# - lifecycleStagesV2_store_detected: true
+```
+
+**GitHub Actions Example:**
+```yaml
+- name: Download Wiz CLI
+  run: |
+    curl -Lo wizcli https://downloads.wiz.io/v1/wizcli/latest/wizcli-linux-amd64
+    chmod +x wizcli
+
+- name: Build Docker image
+  run: docker build -t $IMAGE_TAG -f app/nextjs/Dockerfile .
+
+- name: Scan with Wiz CLI (BEFORE push)
+  env:
+    WIZ_CLIENT_ID: ${{ secrets.WIZ_CLIENT_ID }}
+    WIZ_CLIENT_SECRET: ${{ secrets.WIZ_CLIENT_SECRET }}
+  run: ./wizcli docker scan --image $IMAGE_TAG --dockerfile app/nextjs/Dockerfile
+
+- name: Push to ECR
+  run: docker push $IMAGE_TAG
+
+- name: Tag for Code-to-Cloud (AFTER push)
+  env:
+    WIZ_CLIENT_ID: ${{ secrets.WIZ_CLIENT_ID }}
+    WIZ_CLIENT_SECRET: ${{ secrets.WIZ_CLIENT_SECRET }}
+  run: ./wizcli docker tag --image $IMAGE_TAG
+```
+
+---
 
 **ECR Connector Error (Cosmetic):**
 The ECR connector may show `CONNECTION_ERROR` but this is non-blocking. Container images are scanned via:
